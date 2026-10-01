@@ -1,46 +1,63 @@
 'use client';
 
-import { MessageCircle, Send } from 'lucide-react';
-import { Product } from '@/lib/types';
+import { ExternalLink, MessageCircle, Phone, Send } from 'lucide-react';
+import { formatPrice } from '@/lib/catalog';
+import { Product, Store } from '@/lib/types';
 
 interface ContactButtonProps {
-  product: Product;
+  store: Store;
+  // When given, the WhatsApp message names the product the buyer is asking about.
+  product?: Product;
 }
 
-export function ContactButton({ product }: ContactButtonProps) {
-  const generateWhatsAppMessage = () => {
-    const message = `Здравствуйте! Интересует товар: ${product.name}\n\nЦена: ${product.priceRange || `${product.price} сом`}\nЦвет: ${product.color}\n\nХотел бы узнать подробности о размерах и наличии.`;
-    const encodedMessage = encodeURIComponent(message);
-    const phone = product.seller.whatsapp || product.seller.contact.replace(/\D/g, '');
-    return `https://wa.me/${phone}?text=${encodedMessage}`;
-  };
+const primary =
+  'inline-flex items-center justify-center w-full rounded-md text-sm font-medium transition-colors h-10 px-4 py-2 bg-green-600 text-white hover:bg-green-700';
+const secondary =
+  'inline-flex items-center justify-center w-full rounded-md text-sm font-medium transition-colors h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground';
 
-  const generateInstagramMessage = () => {
-    return `https://instagram.com/${product.seller.instagram}`;
-  };
+export function ContactButton({ store, product }: ContactButtonProps) {
+  const message = product
+    ? `Здравствуйте! Интересует товар: ${product.title}\nЦена: ${formatPrice(product.priceMinor)}\n${product.sourceUrl}\n\nПодскажите, пожалуйста, наличие и размеры.`
+    : 'Здравствуйте! Пишу вам с TopWear.';
 
   return (
     <div className="space-y-2">
-      <a
-        href={generateWhatsAppMessage()}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center justify-center w-full rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white hover:bg-green-700 h-10 px-4 py-2"
-      >
-        <MessageCircle className="w-4 h-4 mr-2" />
-        Написать в WhatsApp
-      </a>
-      {product.seller.instagram && (
+      {store.whatsapp ? (
         <a
-          href={generateInstagramMessage()}
+          href={`https://wa.me/${store.whatsapp}?text=${encodeURIComponent(message)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center w-full rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+          className={primary}
         >
-          <Send className="w-4 h-4 mr-2" />
-          Написать в Instagram
+          <MessageCircle className="w-4 h-4 mr-2" />
+          Написать в WhatsApp
+        </a>
+      ) : (
+        <a href={`tel:${store.phone.replace(/[^\d+]/g, '')}`} className={primary}>
+          <Phone className="w-4 h-4 mr-2" />
+          Позвонить {store.phone}
         </a>
       )}
+      {store.instagram && (
+        <a
+          href={`https://instagram.com/${store.instagram}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={secondary}
+        >
+          <Send className="w-4 h-4 mr-2" />
+          Instagram магазина
+        </a>
+      )}
+      <a
+        href={product ? product.sourceUrl : store.website}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={secondary}
+      >
+        <ExternalLink className="w-4 h-4 mr-2" />
+        {product ? 'Открыть на сайте магазина' : 'Сайт магазина'}
+      </a>
     </div>
   );
 }

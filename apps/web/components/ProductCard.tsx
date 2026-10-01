@@ -1,9 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { Heart } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { formatPrice, getStore } from '@/lib/catalog';
 import { Product } from '@/lib/types';
 import { useApp } from '@/lib/context';
 
@@ -14,21 +15,22 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const { isFavorite, toggleFavorite } = useApp();
   const favorite = isFavorite(product.id);
+  const store = getStore(product.storeId);
 
   return (
     <Link href={`/products/${product.id}`}>
-      <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+      <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-full">
         <CardContent className="p-0">
-          <div className="relative aspect-square bg-gray-100">
-            <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-              <span className="text-4xl">👕</span>
-            </div>
-            {product.similarityScore && (
-              <Badge className="absolute top-2 right-2 bg-blue-600">
-                {Math.round(product.similarityScore * 100)}%
-              </Badge>
-            )}
+          <div className="relative aspect-[3/4] bg-gray-100">
+            <Image
+              src={product.images[0]}
+              alt={product.title}
+              fill
+              sizes="(max-width: 768px) 50vw, 25vw"
+              className="object-cover"
+            />
             <button
+              aria-label={favorite ? 'Убрать из избранного' : 'Добавить в избранное'}
               onClick={(e) => {
                 e.preventDefault();
                 toggleFavorite(product.id);
@@ -44,12 +46,15 @@ export function ProductCard({ product }: ProductCardProps) {
           </div>
           <div className="p-3">
             <h3 className="font-medium text-sm text-gray-900 mb-1 line-clamp-2">
-              {product.name}
+              {product.title}
             </h3>
-            <p className="text-sm text-gray-600 mb-2">{product.category}</p>
-            <p className="font-bold text-sm text-gray-900">
-              {product.priceRange || `${product.price} сом`}
-            </p>
+            {store && <p className="text-xs text-gray-500 mb-1 truncate">{store.name}</p>}
+            {product.sizes.length > 0 && (
+              <p className="text-xs text-gray-600 mb-2 truncate">
+                Размеры: {product.sizes.join(', ')}
+              </p>
+            )}
+            <p className="font-bold text-sm text-gray-900">{formatPrice(product.priceMinor)}</p>
           </div>
         </CardContent>
       </Card>

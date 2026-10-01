@@ -4,24 +4,20 @@ import { useState } from 'react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { VisualSearchModal } from '@/components/VisualSearchModal';
 import { ProductCard } from '@/components/ProductCard';
-import { mockProducts } from '@/lib/mockData';
+import { products } from '@/lib/catalog';
+import { Product } from '@/lib/types';
 
 export default function SearchPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchResults, setSearchResults] = useState<typeof mockProducts>([]);
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   const handleSearch = () => {
     setIsSearching(true);
     // Simulate search delay
     setTimeout(() => {
-      const results = mockProducts
-        .map(p => ({
-          ...p,
-          similarityScore: Math.random() * 0.3 + 0.7,
-        }))
-        .sort((a, b) => (b.similarityScore || 0) - (a.similarityScore || 0))
-        .slice(0, 6);
+      // Placeholder until the visual search API exists: a random sample of the catalog.
+      const results = [...products].sort(() => Math.random() - 0.5).slice(0, 6);
       setSearchResults(results);
       setIsSearching(false);
       setIsModalOpen(false);
@@ -29,14 +25,14 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="min-h-screen pb-20 bg-gray-50">
+    <div className="min-h-screen pb-24 md:pb-12">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
-        <div className="px-4 py-3">
+        <div className="mx-auto max-w-6xl px-4 py-3">
           <h1 className="text-xl font-bold text-gray-900">Найти по фото</h1>
         </div>
       </header>
 
-      <main className="px-4 py-4">
+      <main className="mx-auto max-w-6xl px-4 py-4">
         {!isSearching && searchResults.length === 0 && (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">📷</div>
@@ -66,7 +62,7 @@ export default function SearchPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                Похожие товары
+                Похожие по фото
               </h2>
               <button
                 onClick={() => setIsModalOpen(true)}
@@ -75,7 +71,7 @@ export default function SearchPage() {
                 Новый поиск
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {searchResults.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}

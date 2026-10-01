@@ -2,26 +2,26 @@
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ProductCard } from '@/components/ProductCard';
-import { mockProducts } from '@/lib/mockData';
+import { products } from '@/lib/catalog';
 import { useApp } from '@/lib/context';
 
 export default function FavoritesPage() {
   const { state } = useApp();
-  const favoriteProducts = mockProducts.filter((product) =>
+  const favoriteProducts = products.filter((product) =>
     state.favorites.includes(product.id)
   );
 
   return (
-    <div className="min-h-screen pb-20 bg-gray-50">
+    <div className="min-h-screen pb-24 md:pb-12">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
-        <div className="px-4 py-3">
+        <div className="mx-auto max-w-6xl px-4 py-3">
           <h1 className="text-xl font-bold text-gray-900">Избранное</h1>
         </div>
       </header>
 
-      <main className="px-4 py-4">
+      <main className="mx-auto max-w-6xl px-4 py-4">
         {favoriteProducts.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {favoriteProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
