@@ -1,0 +1,53 @@
+name: topwear
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: topwear-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-topwear}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-topwear_password}
+      POSTGRES_DB: ${POSTGRES_DB:-topwear_db}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Runs once, on first boot of an empty volume: enables the pgvector extension.
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: topwear-minio
+    restart: unless-stopped
+    # Pre-create the buckets as directories before the server starts:
+    # one for catalog assets, one for images users upload as search queries.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mkdir -p "/data/$${ASSETS_BUCKET}" "/data/$${SEARCH_QUERIES_BUCKET}" &&
+        exec minio server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      ASSETS_BUCKET: ${MINIO_BUCKET_ASSETS:-topwear-assets}
+      SEARCH_QUERIES_BUCKET: ${MINIO_BUCKET_SEARCH_QUERIES:-topwear-search-queries}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  minio_data:
