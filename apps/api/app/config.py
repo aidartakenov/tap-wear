@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     app_name: str = "TopWear API"
     environment: Literal["local", "staging", "production"] = "local"
     debug: bool = False
+    api_v1_prefix: str = "/api/v1"
+    # Browser origins allowed to call the API (the Next.js dev server by default).
+    cors_origins: list[str] = ["http://localhost:3000"]
 
     # Database. Required: there is deliberately no default, so a missing
     # DATABASE_URL fails at startup instead of falling back to a baked-in credential.
