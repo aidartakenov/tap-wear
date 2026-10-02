@@ -13,9 +13,10 @@ import {
 import { ErrorState, Loading } from '@/components/PageState';
 import { RequireAccount } from '@/components/RequireAccount';
 import { decide, getReports, getReviewQueue, resolveReport } from '@/lib/api';
-import { audienceLabels, formatPrice, reportReasonLabels } from '@/lib/catalog';
+import { formatPrice } from '@/lib/catalog';
 import { Decision } from '@/lib/types';
 import { useApi } from '@/lib/useApi';
+import { useApp } from '@/lib/context';
 
 // Approve, or reject / block with a reason. Calls onDone once the decision is saved.
 function DecisionBar({
@@ -27,6 +28,7 @@ function DecisionBar({
   id: string;
   onDone: () => void;
 }) {
+  const { tr } = useApp();
   const [reason, setReason] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -54,18 +56,18 @@ function DecisionBar({
         className={inputClass}
         value={reason}
         onChange={(event) => setReason(event.target.value)}
-        placeholder="Причина (обязательна для отказа и блокировки)"
+        placeholder={tr('Причина (обязательна для отказа и блокировки)')}
         maxLength={1000}
       />
       <div className="flex flex-wrap gap-2">
         <button onClick={() => send('approve')} disabled={busy} className={primaryButton}>
-          Одобрить
+          {tr('Одобрить')}
         </button>
         <button onClick={() => send('reject')} disabled={busy || needsReason} className={secondaryButton}>
-          Вернуть на доработку
+          {tr('Вернуть на доработку')}
         </button>
         <button onClick={() => send('block')} disabled={busy || needsReason} className={dangerButton}>
-          Заблокировать
+          {tr('Заблокировать')}
         </button>
       </div>
       <FormError error={error} />
@@ -74,6 +76,7 @@ function DecisionBar({
 }
 
 function Moderation() {
+  const { tr, t } = useApp();
   const [refresh, setRefresh] = useState(0);
   const { data, error, loading } = useApi(
     async (signal) => {
@@ -92,7 +95,9 @@ function Moderation() {
   return (
     <div className={`space-y-8 ${loading ? 'opacity-60' : ''}`}>
       <section className="space-y-3">
-        <h2 className="text-lg font-bold text-gray-900">Магазины на проверке: {queue.stores.length}</h2>
+        <h2 className="text-lg font-bold text-gray-900">
+          {tr('Магазины на проверке: {n}', { n: queue.stores.length })}
+        </h2>
         {queue.stores.map((store) => (
           <article key={store.id} className="space-y-2 rounded-xl border border-gray-200 bg-white p-4">
             <h3 className="font-semibold text-gray-900">{store.name}</h3>
@@ -100,7 +105,7 @@ function Moderation() {
             <p className="text-sm text-gray-600">
               {[store.address, store.phone, store.instagram && `@${store.instagram}`, store.website]
                 .filter(Boolean)
-                .join(' · ') || 'Контакты не указаны'}
+                .join(' · ') || tr('Контакты не указаны')}
             </p>
             <DecisionBar target="stores" id={store.id} onDone={reload} />
           </article>
@@ -108,14 +113,17 @@ function Moderation() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-bold text-gray-900">Товары на проверке: {queue.products.length}</h2>
+        <h2 className="text-lg font-bold text-gray-900">
+          {tr('Товары на проверке: {n}', { n: queue.products.length })}
+        </h2>
         {queue.products.map((product) => (
           <article key={product.id} className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
             <div>
               <h3 className="font-semibold text-gray-900">{product.title}</h3>
               <p className="text-sm text-gray-600">
-                {product.store_name} · {product.category} · {audienceLabels[product.audience]} ·{' '}
-                {formatPrice(product.base_price_minor)} · вариантов: {product.variant_count}
+                {product.store_name} · {product.category} · {t(`audience.${product.audience}`)} ·{' '}
+                {formatPrice(product.base_price_minor)} ·{' '}
+                {tr('вариантов: {n}', { n: product.variant_count })}
               </p>
             </div>
             <div className="flex gap-2 overflow-x-auto">
@@ -134,10 +142,12 @@ function Moderation() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-bold text-gray-900">Жалобы покупателей: {reports.length}</h2>
+        <h2 className="text-lg font-bold text-gray-900">
+          {tr('Жалобы покупателей: {n}', { n: reports.length })}
+        </h2>
         {reports.map((report) => (
           <article key={report.id} className="space-y-2 rounded-xl border border-gray-200 bg-white p-4">
-            <p className="font-semibold text-gray-900">{reportReasonLabels[report.reason]}</p>
+            <p className="font-semibold text-gray-900">{t(`reportReason.${report.reason}`)}</p>
             <p className="text-sm text-gray-600">
               <a href={`/products/${report.product_id}`} className="text-blue-600 hover:underline">
                 {report.product_title}
@@ -150,7 +160,7 @@ function Moderation() {
                 className={inputClass}
                 value={resolutions[report.id] ?? ''}
                 onChange={(event) => setResolutions({ ...resolutions, [report.id]: event.target.value })}
-                placeholder="Что сделано"
+                placeholder={tr('Что сделано')}
                 maxLength={1000}
               />
               <button
@@ -161,7 +171,7 @@ function Moderation() {
                 disabled={!resolutions[report.id]?.trim()}
                 className={`${primaryButton} shrink-0`}
               >
-                Закрыть
+                {tr('Закрыть')}
               </button>
             </div>
           </article>
@@ -172,11 +182,12 @@ function Moderation() {
 }
 
 export default function AdminPage() {
+  const { tr } = useApp();
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-3xl px-4 py-3">
-          <h1 className="text-xl font-bold text-gray-900">Модерация</h1>
+          <h1 className="text-xl font-bold text-gray-900">{tr('Модерация')}</h1>
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-4">

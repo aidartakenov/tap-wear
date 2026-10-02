@@ -6,7 +6,7 @@ import io
 import pytest
 from PIL import Image
 
-from app import storage
+from app import mailer, storage
 from app.config import get_settings
 from tests.conftest import ADMIN_EMAIL, PASSWORD, SOM, prepare_database
 
@@ -25,7 +25,7 @@ class Actor:
     """One signed-in person. The shared test client carries only one cookie jar,
     so each request is sent with this person's session cookie and CSRF token."""
 
-    def __init__(self, client, email: str, *, register: bool = True):
+    def __init__(self, client, email: str, *, register: bool = True, verify: bool = True):
         self.client = client
         client.cookies.clear()
         path = "register" if register else "login"
@@ -36,6 +36,11 @@ class Actor:
         assert response.status_code in (200, 201), response.text
         self.token = response.cookies[COOKIE]
         self.csrf = response.json()["csrf_token"]
+        if register and verify:
+            # Open the confirmation link from the email the API has just "sent".
+            link = mailer.outbox[-1].body.split("token=")[1].split()[0]
+            confirmed = client.post(f"{API}/auth/verify-email", json={"token": link})
+            assert confirmed.status_code == 204, confirmed.text
 
     def request(self, method: str, path: str, *, csrf: bool = True, **kwargs):
         self.client.cookies.clear()
@@ -57,7 +62,9 @@ class Actor:
 
 
 def new_store(actor: Actor, name: str) -> dict:
-    response = actor.post("/merchant/stores", json={"name": name, "city_code": "bishkek"})
+    response = actor.post(
+        "/merchant/stores", json={"name": name, "city_code": "bishkek", "audiences": ["men"]}
+    )
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -183,7 +190,9 @@ def test_logout_revokes_the_session(client):
 
 def test_changing_request_without_csrf_token_is_refused(owner):
     response = owner.post(
-        "/merchant/stores", csrf=False, json={"name": "No token", "city_code": "bishkek"}
+        "/merchant/stores",
+        csrf=False,
+        json={"name": "No token", "city_code": "bishkek", "audiences": ["men"]},
     )
 
     assert response.status_code == 403
@@ -224,7 +233,10 @@ def test_another_seller_cannot_see_or_change_the_store(owner, stranger, store):
         stranger.post("/merchant/products", json=creation),
         stranger.get(f"/merchant/stores/{store_id}/members"),
         stranger.post(f"/merchant/stores/{store_id}/members", json={"email": "x@y.test"}),
-        stranger.patch(f"/merchant/stores/{store_id}", json={"name": "Hi", "city_code": "bishkek"}),
+        stranger.patch(
+            f"/merchant/stores/{store_id}",
+            json={"name": "Hi", "city_code": "bishkek", "audiences": ["men"]},
+        ),
         upload(stranger, product["id"], photo()),
     ]
 
@@ -247,7 +259,7 @@ def test_staff_can_manage_products_but_not_the_store_or_its_members(client, owne
     # A staff member cannot give anyone access, including a higher role for themselves.
     invite = {"email": "staff@shop.test", "role": "owner"}
     assert staff.post(f"/merchant/stores/{store['id']}/members", json=invite).status_code == 403
-    rename = {"name": "Переименовано", "city_code": "bishkek"}
+    rename = {"name": "Переименовано", "city_code": "bishkek", "audiences": ["men"]}
     assert staff.patch(f"/merchant/stores/{store['id']}", json=rename).status_code == 403
     members = {
         m["email"]: m["role"] for m in owner.get(f"/merchant/stores/{store['id']}/members").json()
@@ -513,3 +525,160 @@ def test_report_on_a_hidden_product_is_not_accepted(client, owner, store):
     response = client.post(f"{API}/reports", json={"product_id": draft["id"], "reason": "other"})
 
     assert response.status_code == 404
+
+
+# --- Delivery and return conditions ------------------------------------------
+
+
+def test_owner_sets_conditions_and_every_save_keeps_the_earlier_version(client, owner, store):
+    path = f"/merchant/stores/{store['id']}/policy"
+    assert owner.get(path).json() is None
+
+    first = owner.request(
+        "PUT",
+        path,
+        json={
+            "pickup_available": True,
+            "delivery_available": True,
+            "delivery_areas": "Бишкек",
+            "delivery_fee_minor": 200 * SOM,
+            "return_days": 14,
+            "return_terms": "С бирками и чеком",
+        },
+    ).json()
+    second = owner.request("PUT", path, json={"pickup_available": True}).json()
+
+    assert first["version"] == 1 and first["delivery_fee_minor"] == 200 * SOM
+    assert second["version"] == 2
+    # The new version replaces the old one for readers; nothing carries over silently.
+    assert second["delivery_available"] is False and second["return_days"] is None
+    assert owner.get(path).json()["version"] == 2
+
+
+def test_only_the_owner_changes_conditions(client, owner, stranger, store):
+    path = f"/merchant/stores/{store['id']}/policy"
+    helper = Actor(client, "policy-staff@shop.test")
+    owner.post(f"/merchant/stores/{store['id']}/members", json={"email": "policy-staff@shop.test"})
+
+    assert helper.get(path).status_code == 200
+    assert helper.request("PUT", path, json={"pickup_available": True}).status_code == 403
+    assert stranger.request("PUT", path, json={"pickup_available": True}).status_code == 404
+    assert owner.request("PUT", path, json={"delivery_fee_minor": -1}).status_code == 422
+
+
+def test_buyers_see_the_current_conditions_on_the_store(client, owner, admin, store):
+    path = f"/merchant/stores/{store['id']}/policy"
+    owner.request("PUT", path, json={"delivery_available": True, "delivery_time": "1–2 дня"})
+    admin.post(f"/admin/stores/{store['id']}/decision", json={"decision": "approve"})
+    client.cookies.clear()
+
+    public = client.get(f"{API}/stores/{store['slug']}").json()
+
+    assert public["policy"]["delivery_time"] == "1–2 дня"
+    assert public["policy"]["delivery_fee_minor"] is None
+
+
+# --- Optional height per size ------------------------------------------------
+
+
+def test_seller_can_state_a_height_for_a_size_and_buyers_see_it(client, owner, admin, store):
+    product = new_product(
+        owner,
+        store["id"],
+        title="Худи с ростом",
+        variants=[
+            {"size_system": "INT", "size_label": "S", "height_min_cm": 160, "height_max_cm": 160},
+            {"size_system": "INT", "size_label": "M", "height_min_cm": 165, "height_max_cm": 175},
+            # Height is optional: this size has none.
+            {"size_system": "INT", "size_label": "L"},
+        ],
+    )
+    heights = {
+        v["size_label"]: (v["height_min_cm"], v["height_max_cm"]) for v in product["variants"]
+    }
+    assert heights == {"S": (160, 160), "M": (165, 175), "L": (None, None)}
+
+
+def test_height_must_be_a_complete_sensible_range(owner, store):
+    def create(**height):
+        body = {
+            "store_id": store["id"],
+            "title": "Рост",
+            "category": "jackets",
+            "audience": "men",
+            "base_price_minor": 100,
+            "variants": [{"size_system": "INT", "size_label": "S", **height}],
+        }
+        return owner.post("/merchant/products", json=body).status_code
+
+    assert create(height_min_cm=160) == 422
+    assert create(height_min_cm=180, height_max_cm=170) == 422
+    assert create(height_min_cm=16, height_max_cm=17) == 422
+    assert create(height_min_cm=170, height_max_cm=180) == 201
+
+
+# --- Store avatar -----------------------------------------------------------
+
+
+def my_store(actor: Actor, store_id: str) -> dict:
+    return next(item for item in actor.get("/merchant/stores").json() if item["id"] == store_id)
+
+
+def upload_avatar(actor: Actor, store_id: str, data: bytes):
+    return actor.request(
+        "PUT", f"/merchant/stores/{store_id}/avatar", files={"file": ("me.jpg", data, "image/jpeg")}
+    )
+
+
+def test_store_avatar_is_cropped_to_a_square_and_can_be_replaced_or_removed(
+    owner, store, object_storage
+):
+    bucket = get_settings().minio_bucket_assets
+    assert store["avatar_url"] is None
+
+    first = upload_avatar(owner, store["id"], photo(size=(900, 600)))
+    assert first.status_code == 200, first.text
+    first_key = first.json()["avatar_url"].split(f"/{bucket}/", 1)[1]
+    image = Image.open(io.BytesIO(storage.client().get_object(bucket, first_key).read()))
+    assert image.size == (storage.AVATAR_SIDE, storage.AVATAR_SIDE)
+
+    # A new picture replaces the old one, and the old file is deleted.
+    second = upload_avatar(owner, store["id"], photo(fmt="PNG", size=(200, 300)))
+    second_url = second.json()["avatar_url"]
+    assert second_url != first.json()["avatar_url"]
+    with pytest.raises(Exception):  # noqa: B017, PT011 - the storage client's "no such key" error
+        storage.client().stat_object(bucket, first_key)
+    assert my_store(owner, store["id"])["avatar_url"] == second_url
+    public = owner.get(f"/stores/{store['slug']}")
+    if public.status_code == 200:
+        assert public.json()["avatar_url"] == second_url
+
+    removed = owner.delete(f"/merchant/stores/{store['id']}/avatar")
+    assert removed.json()["avatar_url"] is None
+
+
+def test_store_avatar_rejects_non_images_and_other_accounts(owner, stranger, store, object_storage):
+    assert upload_avatar(owner, store["id"], b"<svg/>").json()["code"] == "unsupported_image"
+    assert upload_avatar(stranger, store["id"], photo()).status_code in (403, 404)
+    assert my_store(owner, store["id"])["avatar_url"] is None
+
+
+# --- Store type ---------------------------------------------------------------
+
+
+def test_store_must_say_who_it_sells_for(owner, store):
+    body = {"name": "Без типа", "city_code": "bishkek"}
+    assert owner.post("/merchant/stores", json=body).status_code == 422
+    assert owner.post("/merchant/stores", json=body | {"audiences": []}).status_code == 422
+    assert owner.post("/merchant/stores", json=body | {"audiences": ["unisex"]}).status_code == 422
+
+    changed = owner.patch(
+        f"/merchant/stores/{store['id']}",
+        json={
+            "name": store["name"],
+            "city_code": "bishkek",
+            "audiences": ["kids", "women", "kids"],
+        },
+    )
+    # Duplicates are dropped and the order is fixed.
+    assert changed.json()["audiences"] == ["women", "kids"]

@@ -5,23 +5,30 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight, MapPin, Phone } from 'lucide-react';
 import { useApp } from '@/lib/context';
-import { Store } from '@/lib/types';
+import { STORE_AUDIENCES, Store } from '@/lib/types';
+import { StoreAvatar } from '@/components/StoreAvatar';
 
 interface StoreCardProps {
   store: Store;
 }
 
 export function StoreCard({ store }: StoreCardProps) {
-  const { count } = useApp();
+  const { count, t } = useApp();
   return (
     <Link href={`/stores/${store.slug}`} className="block">
       <Card className="hover:shadow-md transition-shadow">
         <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-2">
-            <div>
+          <div className="flex items-center gap-3 mb-3">
+            <StoreAvatar name={store.name} url={store.avatar_url} className="h-12 w-12 text-base" />
+            <div className="min-w-0 flex-1">
               <h3 className="font-semibold text-gray-900">{store.name}</h3>
               <p className="text-sm text-gray-500 mt-0.5">
-                {count(store.product_count, 'product')}
+                {[
+                  ...STORE_AUDIENCES.filter((audience) => store.audiences.includes(audience)).map(
+                    (audience) => t(`storeAudience.${audience}`)
+                  ),
+                  count(store.product_count, 'product'),
+                ].join(' · ')}
               </p>
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />

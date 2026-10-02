@@ -86,6 +86,10 @@ Requirements: Docker Desktop, Python 3.11+, [uv](https://docs.astral.sh/uv/), No
 
 Sessions use an HttpOnly cookie; every changing request must also carry the session's CSRF token in the `X-CSRF-Token` header (the web app does this automatically).
 
+## Delivery and return conditions
+
+Each store owner fills in the store's own conditions in the cabinet: pickup, delivery area, fee and time, try-on at delivery, payment methods, and the return period and terms. Buyers see them on the store page and on every product page before contacting the seller. Each save is stored as a new version and earlier versions are kept. The conditions are the seller's statement; they do not replace the buyer's rights under consumer protection law.
+
 ## Stock freshness and statistics
 
 - **Freshness:** a variant marked "in stock" is shown to buyers as in stock only while its confirmation is recent. After `AVAILABILITY_REMINDER_HOURS` (48) the seller sees a reminder in the cabinet; after `AVAILABILITY_STALE_HOURS` (72) buyers see "availability needs checking" and the variant no longer matches the "in stock" filter, until the seller confirms it. Setting a new stock status counts as a confirmation; other edits do not.
@@ -94,8 +98,18 @@ Sessions use an HttpOnly cookie; every changing request must also carry the sess
 
 ## Languages and request limits
 
-- **Languages:** the buyer-facing pages are in Russian and Kyrgyz; the switch is in the header and the choice is kept in a cookie. Interface text lives in `apps/web/lib/i18n` (`ru.ts` is the source, `ky.ts` must have the same keys). The API returns category, colour and city names in the language of the `Accept-Language` header, falling back to Russian. The Kyrgyz text was machine-drafted and needs review by a native speaker before a public release. The seller cabinet and moderation pages are Russian only for now.
+- **Languages:** the buyer-facing pages are in Russian and Kyrgyz; the switch is in the header and the choice is kept in a cookie. Interface text lives in `apps/web/lib/i18n` (`ru.ts` is the source, `ky.ts` must have the same keys). The API returns category, colour and city names in the language of the `Accept-Language` header, falling back to Russian. The Kyrgyz text was machine-drafted and needs review by a native speaker before a public release. The seller cabinet and moderation pages are translated too; their Kyrgyz text is in `kySeller.ts`, keyed by the Russian source text.
 - **Request limits:** sign-in, registration, reports, events and photo uploads are limited per client address (`RATE_LIMIT_ENABLED`). Counters are kept in the API process's memory, which is enough for a single process.
+
+## Email
+
+Registration sends a confirmation link; opening a store requires a confirmed address (saving favorites does not). "Forgot password" sends a single-use link that is valid for one hour and signs out all sessions when used. The answer is the same whether or not the address has an account.
+
+With `EMAIL_BACKEND=console` (the default) messages are written to the API log and nothing is sent. In local development they can also be read at `http://localhost:8000/api/v1/dev/outbox`. For real delivery set `EMAIL_BACKEND=smtp` and the `SMTP_*` variables.
+
+## Deployment
+
+`infra/docker-compose.prod.yml` runs the whole product on one server behind Caddy with automatic HTTPS. Installation, updates, rollback, backups and restore are described in [docs/RUNBOOK.md](docs/RUNBOOK.md). GitHub Actions (`.github/workflows/ci.yml`) runs lint, tests and a web build on every push to `development` and `main`.
 
 ## Checks
 

@@ -3,9 +3,10 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Heart, LogOut, Shield, Store, User } from 'lucide-react';
+import { Bookmark, ChevronRight, LogOut, Shield, Store, User } from 'lucide-react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { Loading } from '@/components/PageState';
+import { VerifyEmailNotice } from '@/components/VerifyEmailNotice';
 import {
   Field,
   FormError,
@@ -179,9 +180,11 @@ export default function ProfilePage() {
               )}
             </section>
 
+            <VerifyEmailNotice />
+
             <Row
               href="/favorites"
-              icon={Heart}
+              icon={Bookmark}
               title={t('nav.favorites')}
               text={
                 favorites.length

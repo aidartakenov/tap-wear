@@ -5,6 +5,7 @@ import { ErrorState, Loading } from '@/components/PageState';
 import { getStoreAnalytics } from '@/lib/api';
 import { StoreAnalytics } from '@/lib/types';
 import { useApi } from '@/lib/useApi';
+import { useApp } from '@/lib/context';
 
 const channelLabels: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -42,6 +43,7 @@ const shortDate = (date: string) => `${date.slice(8, 10)}.${date.slice(5, 7)}`;
 
 // Product views per day: one series, thin columns from a common baseline.
 function DailyViews({ data }: { data: StoreAnalytics }) {
+  const { tr } = useApp();
   const [hovered, setHovered] = useState<string | null>(null);
   const byDate = new Map(data.daily.map((day) => [day.date, day]));
   const days = lastDays(data.days).map((date) => ({
@@ -55,11 +57,15 @@ function DailyViews({ data }: { data: StoreAnalytics }) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="font-semibold text-gray-900">Просмотры товаров по дням</h3>
+        <h3 className="font-semibold text-gray-900">{tr('Просмотры товаров по дням')}</h3>
         <p className="text-xs text-gray-500" aria-live="polite">
           {active
-            ? `${shortDate(active.date)}: просмотров ${number(active.views)}, обращений ${number(active.contacts)}`
-            : `максимум за день: ${number(max)}`}
+            ? tr('{date}: просмотров {views}, обращений {contacts}', {
+                date: shortDate(active.date),
+                views: number(active.views),
+                contacts: number(active.contacts),
+              })
+            : tr('максимум за день: {max}', { max: number(max) })}
         </p>
       </div>
       <div
@@ -73,7 +79,11 @@ function DailyViews({ data }: { data: StoreAnalytics }) {
             onMouseEnter={() => setHovered(day.date)}
             onFocus={() => setHovered(day.date)}
             tabIndex={0}
-            aria-label={`${shortDate(day.date)}: просмотров ${day.views}, обращений ${day.contacts}`}
+            aria-label={tr('{date}: просмотров {views}, обращений {contacts}', {
+              date: shortDate(day.date),
+              views: day.views,
+              contacts: day.contacts,
+            })}
             className={`flex h-full flex-1 items-end justify-center outline-none ${
               hovered === day.date ? 'bg-gray-100' : ''
             }`}
@@ -90,13 +100,13 @@ function DailyViews({ data }: { data: StoreAnalytics }) {
         <span>{shortDate(days[days.length - 1].date)}</span>
       </div>
       <details className="mt-3 text-sm">
-        <summary className="cursor-pointer text-gray-600">Показать таблицей</summary>
+        <summary className="cursor-pointer text-gray-600">{tr('Показать таблицей')}</summary>
         <table className="mt-2 w-full text-left">
           <thead className="text-xs text-gray-500">
             <tr>
-              <th className="py-1 font-medium">День</th>
-              <th className="py-1 font-medium text-right">Просмотры</th>
-              <th className="py-1 font-medium text-right">Обращения</th>
+              <th className="py-1 font-medium">{tr('День')}</th>
+              <th className="py-1 font-medium text-right">{tr('Просмотры')}</th>
+              <th className="py-1 font-medium text-right">{tr('Обращения')}</th>
             </tr>
           </thead>
           <tbody>
@@ -127,6 +137,7 @@ function CountList({
   labels: Record<string, string>;
   empty: string;
 }) {
+  const { tr } = useApp();
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4">
       <h3 className="font-semibold text-gray-900">{title}</h3>
@@ -136,7 +147,7 @@ function CountList({
         <ul className="mt-2 divide-y divide-gray-100 text-sm">
           {rows.map((row) => (
             <li key={row.key} className="flex justify-between gap-3 py-1.5">
-              <span className="text-gray-700">{labels[row.key] ?? row.key}</span>
+              <span className="text-gray-700">{tr(labels[row.key] ?? row.key)}</span>
               <span className="font-medium tabular-nums text-gray-900">{number(row.count)}</span>
             </li>
           ))}
@@ -147,6 +158,7 @@ function CountList({
 }
 
 export function StoreStatistics({ storeId }: { storeId: string }) {
+  const { tr } = useApp();
   const [days, setDays] = useState(7);
   const { data, error, loading } = useApi(
     (signal) => getStoreAnalytics(storeId, days, signal),
@@ -159,7 +171,7 @@ export function StoreStatistics({ storeId }: { storeId: string }) {
 
   return (
     <div className={`space-y-4 ${loading ? 'opacity-60' : ''}`}>
-      <div className="flex items-center gap-2" role="group" aria-label="Период">
+      <div className="flex items-center gap-2" role="group" aria-label={tr('Период')}>
         {[7, 30].map((value) => (
           <button
             key={value}
@@ -171,61 +183,62 @@ export function StoreStatistics({ storeId }: { storeId: string }) {
                 : 'border-gray-300 text-gray-700 hover:bg-gray-50'
             }`}
           >
-            {value} дней
+            {tr('{n} дней', { n: value })}
           </button>
         ))}
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Tile label="Посетители" value={data.visitors} note="Открыли витрину или товар" />
-        <Tile label="Просмотры товаров" value={data.product_views} />
-        <Tile label="Просмотры витрины" value={data.store_views} />
+        <Tile label={tr('Посетители')} value={data.visitors} note={tr('Открыли витрину или товар')} />
+        <Tile label={tr('Просмотры товаров')} value={data.product_views} />
+        <Tile label={tr('Просмотры витрины')} value={data.store_views} />
         <Tile
-          label="Обращения"
+          label={tr('Обращения')}
           value={data.contact_clicks}
-          note={`От ${number(data.contacting_visitors)} ${
+          note={tr(
             data.contacting_visitors % 10 === 1 && data.contacting_visitors % 100 !== 11
-              ? 'посетителя'
-              : 'посетителей'
-          }`}
+              ? 'От {n} посетителя'
+              : 'От {n} посетителей',
+            { n: number(data.contacting_visitors) }
+          )}
         />
       </div>
       <p className="text-xs text-gray-500">
-        Обращение — это нажатие на кнопку WhatsApp, звонка, Instagram или сайта. Это ещё не
-        продажа: состоялась ли покупка, знает только магазин.
+        {tr('Обращение — это нажатие на кнопку WhatsApp, звонка, Instagram или сайта. Это ещё не продажа: состоялась ли покупка, знает только магазин.')}
       </p>
 
       {noActivity ? (
         <p className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-600">
-          За этот период посещений не было. Поделитесь ссылкой на витрину в Instagram, добавив в
-          конец <code className="rounded bg-gray-100 px-1">?source=instagram</code>, чтобы видеть
-          переходы оттуда отдельно.
+          {tr('За этот период посещений не было. Поделитесь ссылкой на витрину в Instagram, добавив в конец адреса:')}{' '}
+          <code className="rounded bg-gray-100 px-1">?source=instagram</code>
+          {'. '}
+          {tr('Так переходы оттуда будут видны отдельно.')}
         </p>
       ) : (
         <>
           <DailyViews data={data} />
           <div className="grid gap-3 md:grid-cols-2">
             <CountList
-              title="Откуда пришли посетители"
+              title={tr('Откуда пришли посетители')}
               rows={data.sources}
               labels={sourceLabels}
-              empty="Нет данных"
+              empty={tr('Нет данных')}
             />
             <CountList
-              title="Обращения по каналам"
+              title={tr('Обращения по каналам')}
               rows={data.contacts_by_channel}
               labels={channelLabels}
-              empty="Обращений пока не было"
+              empty={tr('Обращений пока не было')}
             />
           </div>
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="font-semibold text-gray-900">Самые просматриваемые товары</h3>
+            <h3 className="font-semibold text-gray-900">{tr('Самые просматриваемые товары')}</h3>
             <table className="mt-2 w-full text-left text-sm">
               <thead className="text-xs text-gray-500">
                 <tr>
-                  <th className="py-1 font-medium">Товар</th>
-                  <th className="py-1 font-medium text-right">Просмотры</th>
-                  <th className="py-1 font-medium text-right">Обращения</th>
+                  <th className="py-1 font-medium">{tr('Товар')}</th>
+                  <th className="py-1 font-medium text-right">{tr('Просмотры')}</th>
+                  <th className="py-1 font-medium text-right">{tr('Обращения')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -243,15 +256,18 @@ export function StoreStatistics({ storeId }: { storeId: string }) {
       )}
 
       <section className="rounded-xl border border-gray-200 bg-white p-4 text-sm">
-        <h3 className="font-semibold text-gray-900">Актуальность наличия</h3>
+        <h3 className="font-semibold text-gray-900">{tr('Актуальность наличия')}</h3>
         <p className="mt-1 text-gray-700">
-          Вариантов «в наличии» у опубликованных товаров: {number(data.freshness.in_stock_variants)}.
-          Подтверждены недавно: {number(data.freshness.confirmed_recently)}.
+          {tr('Вариантов «в наличии» у опубликованных товаров: {total}. Подтверждены недавно: {fresh}.', {
+            total: number(data.freshness.in_stock_variants),
+            fresh: number(data.freshness.confirmed_recently),
+          })}
         </p>
         {data.freshness.needs_confirmation > 0 && (
           <p className="mt-1 text-amber-800">
-            Требуют подтверждения: {number(data.freshness.needs_confirmation)}. Покупатели видят у
-            них «Наличие требует уточнения», пока вы не подтвердите наличие во вкладке «Товары».
+            {tr('Требуют подтверждения: {n}. Покупатели видят у них «Наличие требует уточнения», пока вы не подтвердите наличие во вкладке «Товары».', {
+              n: number(data.freshness.needs_confirmation),
+            })}
           </p>
         )}
       </section>

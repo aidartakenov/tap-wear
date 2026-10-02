@@ -2,17 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutGrid, Store, Camera, Heart, User } from 'lucide-react';
+import { Bookmark, Camera, CircleUserRound, Shirt, Store } from 'lucide-react';
 import { useApp } from '@/lib/context';
 import { Key } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
-const navItems: { href: string; label: Key; icon: typeof User; isCenter?: boolean }[] = [
-  { href: '/catalog', label: 'nav.catalog', icon: LayoutGrid },
+const navItems: { href: string; label: Key; icon: typeof Shirt; isCenter?: boolean }[] = [
+  { href: '/catalog', label: 'nav.catalog', icon: Shirt },
   { href: '/stores', label: 'nav.stores', icon: Store },
   { href: '/search', label: 'nav.photoShort', icon: Camera, isCenter: true },
-  { href: '/favorites', label: 'nav.favorites', icon: Heart },
-  { href: '/profile', label: 'nav.profile', icon: User },
+  { href: '/favorites', label: 'nav.favorites', icon: Bookmark },
+  { href: '/profile', label: 'nav.profile', icon: CircleUserRound },
 ];
 
 export function BottomNavigation() {
@@ -36,10 +36,11 @@ export function BottomNavigation() {
                   isActive ? 'text-blue-600' : 'text-gray-500'
                 )}
               >
-                <div className="absolute -top-6 bg-blue-600 rounded-full p-3 shadow-lg">
-                  <Icon className="w-6 h-6 text-white" />
+                {/* A dark blue square standing on its corner, with the icon kept upright. */}
+                <div className="absolute -top-7 flex h-[52px] w-[52px] rotate-45 items-center justify-center rounded-2xl bg-gray-900 shadow-lg ring-4 ring-white transition-transform duration-200 active:scale-95">
+                  <Icon className="h-6 w-6 -rotate-45 text-white" strokeWidth={2.25} />
                 </div>
-                <span className="text-xs mt-8 font-medium">{t(item.label)}</span>
+                <span className="mt-8 text-[11px] font-medium leading-tight">{t(item.label)}</span>
               </Link>
             );
           }
@@ -53,8 +54,16 @@ export function BottomNavigation() {
                 isActive ? 'text-blue-600' : 'text-gray-500'
               )}
             >
-              <Icon className="w-6 h-6" />
-              <span className="text-xs mt-1 font-medium">{t(item.label)}</span>
+              {/* The open page's icon sits in a soft blue pill. */}
+              <span
+                className={cn(
+                  'flex h-8 w-14 items-center justify-center rounded-full transition-colors',
+                  isActive && 'bg-blue-50'
+                )}
+              >
+                <Icon className="h-6 w-6" strokeWidth={isActive ? 2.25 : 1.75} />
+              </span>
+              <span className="text-[11px] font-medium leading-tight">{t(item.label)}</span>
             </Link>
           );
         })}

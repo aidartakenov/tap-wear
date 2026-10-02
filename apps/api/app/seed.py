@@ -1,10 +1,13 @@
 """Load the demo catalog into the database.
 
     python -m app.seed [path/to/demo_catalog.json]
+    python -m app.seed --reference-only
 
 The file is produced by scripts/import_demo_catalog.py. Loading is repeatable:
 ids are derived from the source ids, so running it again updates the same rows.
-Demo stores are flagged is_demo and must not be presented as live offers.
+Demo stores are flagged is_demo and must not be presented as live offers. With
+--reference-only nothing but the reference lists is loaded: the right choice
+for a real installation.
 """
 
 import asyncio
@@ -16,6 +19,7 @@ from pathlib import Path
 
 from sqlalchemy import delete, select
 
+from app import storage
 from app.catalog.models import (
     Availability,
     Product,
@@ -24,15 +28,41 @@ from app.catalog.models import (
     ProductVariant,
 )
 from app.database import SessionLocal, engine
+from app.errors import ApiError
 from app.reference.models import Category, City, Color
-from app.stores.models import Store, StoreStatus
+from app.stores.models import Store, StoreAudience, StoreStatus
 
 DEFAULT_PATH = Path(__file__).resolve().parent.parent / "seed" / "demo_catalog.json"
+# Avatars of the demo stores: monograms drawn by scripts/make_demo_avatars.py.
+AVATARS_DIR = DEFAULT_PATH.parent / "avatars"
 
 # Fixed namespace so that the same demo id always maps to the same UUID.
 NAMESPACE = uuid.UUID("6f1c2f0e-6a3b-4c58-9f0d-7d1e5b0a9c11")
 
 CITIES = {"Бишкек": "bishkek"}
+
+CATEGORY_NAMES_RU = {
+    "jackets": "Куртки",
+    "coats": "Пальто и тренчи",
+    "suits": "Костюмы",
+    "hoodies": "Худи и свитшоты",
+    "knitwear": "Свитеры и кардиганы",
+    "blazers": "Пиджаки и жакеты",
+    "shirts": "Рубашки и блузы",
+    "dresses": "Платья и юбки",
+    "shorts": "Шорты",
+    "trousers": "Брюки",
+    "tshirts": "Футболки",
+    "fur": "Шубы и дублёнки",
+    "vests": "Жилеты",
+    "sportswear": "Спортивная одежда",
+    "underwear": "Бельё и носки",
+    "shoes": "Обувь",
+    "bags": "Сумки и рюкзаки",
+    "headwear": "Головные уборы",
+    "accessories": "Аксессуары",
+    "national": "Национальная одежда",
+}
 
 # Kyrgyz display names. Machine-drafted: they need review by a native speaker
 # before a public release.
@@ -47,8 +77,17 @@ CATEGORY_NAMES_KY = {
     "shirts": "Рубашкалар жана блузкалар",
     "dresses": "Көйнөктөр жана юбкалар",
     "shorts": "Шортылар",
-    "trousers": "Шымдар жана джинсылар",
-    "tshirts": "Футболкалар жана поло",
+    "trousers": "Шымдар",
+    "tshirts": "Футболкалар",
+    "fur": "Тондор",
+    "vests": "Жилеттер",
+    "sportswear": "Спорттук кийим",
+    "underwear": "Ич кийим жана байпак",
+    "shoes": "Бут кийим",
+    "bags": "Сумкалар жана рюкзактар",
+    "headwear": "Баш кийимдер",
+    "accessories": "Аксессуарлар",
+    "national": "Улуттук кийим",
 }
 COLOR_NAMES_KY = {
     "black": "Кара",
@@ -61,6 +100,12 @@ COLOR_NAMES_KY = {
     "burgundy": "Кочкул кызыл",
     "red": "Кызыл",
     "beige": "Беж",
+    "gray": "Боз",
+    "light_blue": "Ачык көк",
+    "yellow": "Сары",
+    "purple": "Кызгылт көк",
+    "khaki": "Хаки",
+    "multicolor": "Ар түстүү",
 }
 
 COLORS = {
@@ -74,23 +119,45 @@ COLORS = {
     "Бордовый": "burgundy",
     "Красный": "red",
     "Бежевый": "beige",
+    "Серый": "gray",
+    "Голубой": "light_blue",
+    "Желтый": "yellow",
+    "Фиолетовый": "purple",
+    "Хаки": "khaki",
+    "Разноцветный": "multicolor",
 }
+
+
+async def demo_avatar_key(store_id: uuid.UUID, slug: str) -> str | None:
+    """Upload the demo store's avatar (seed/avatars/<slug>.png), if there is one."""
+    file = AVATARS_DIR / f"{slug}.png"
+    if not file.exists():
+        return None
+    try:
+        image = storage.process_image(file.read_bytes(), square_side=storage.AVATAR_SIDE)
+        return await storage.store_avatar(store_id, image, name=f"demo-{image.content_hash[:12]}")
+    except ApiError as error:
+        print(f"Avatar of {slug} was not loaded: {error.message}")
+        return None
 
 
 def demo_uuid(*parts: object) -> uuid.UUID:
     return uuid.uuid5(NAMESPACE, ":".join(str(part) for part in parts))
 
 
-async def seed(path: Path) -> None:
-    catalog = json.loads(path.read_text())
-    generated_at = datetime.fromisoformat(catalog["generatedAt"])
+async def seed(path: Path | None) -> None:
+    # Without a file only the reference lists (cities, categories, colours) are loaded.
+    catalog = json.loads(path.read_text()) if path else {"stores": [], "products": []}
+    generated_at = datetime.fromisoformat(catalog["generatedAt"]) if path else None
 
     async with SessionLocal() as session:
         for name, code in CITIES.items():
             await session.merge(City(code=code, name_ru=name, name_ky=CITY_NAMES_KY.get(code)))
         for name, code in COLORS.items():
             await session.merge(Color(code=code, name_ru=name, name_ky=COLOR_NAMES_KY.get(code)))
-        categories = {p["category"]: p["categoryLabel"] for p in catalog["products"]}
+        categories = CATEGORY_NAMES_RU | {
+            p["category"]: p["categoryLabel"] for p in catalog["products"]
+        }
         for position, (code, label) in enumerate(sorted(categories.items(), key=lambda c: c[1])):
             await session.merge(
                 Category(
@@ -105,13 +172,22 @@ async def seed(path: Path) -> None:
         store_ids = {}
         for item in catalog["stores"]:
             store_ids[item["id"]] = demo_uuid("store", item["id"])
-            await session.merge(
+            store = await session.merge(
                 Store(
                     id=store_ids[item["id"]],
                     slug=item["id"],
                     name=item["name"],
                     description=item["description"],
                     city_code=CITIES[item["city"]],
+                    # Whoever the store's products are for.
+                    audiences=[
+                        audience
+                        for audience in StoreAudience
+                        if any(
+                            p["storeId"] == item["id"] and p["audience"] == audience
+                            for p in catalog["products"]
+                        )
+                    ],
                     address=item["address"],
                     working_hours=item["workingHours"],
                     phone=item["phone"],
@@ -122,6 +198,9 @@ async def seed(path: Path) -> None:
                     is_demo=True,
                 )
             )
+            # Keeps the current avatar when storage is unreachable.
+            if key := await demo_avatar_key(store.id, item["id"]):
+                store.avatar_key = key
         await session.flush()
 
         product_ids = []
@@ -198,12 +277,13 @@ async def seed(path: Path) -> None:
             )
 
         # Demo products that disappeared from the source are removed entirely.
-        demo_store_ids = select(Store.id).where(Store.is_demo)
-        await session.execute(
-            delete(Product).where(
-                Product.store_id.in_(demo_store_ids), Product.id.not_in(product_ids)
+        if path:
+            demo_store_ids = select(Store.id).where(Store.is_demo)
+            await session.execute(
+                delete(Product).where(
+                    Product.store_id.in_(demo_store_ids), Product.id.not_in(product_ids)
+                )
             )
-        )
         await session.commit()
 
     await engine.dispose()
@@ -211,4 +291,8 @@ async def seed(path: Path) -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(seed(Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_PATH))
+    argument = sys.argv[1] if len(sys.argv) > 1 else None
+    if argument == "--reference-only":
+        asyncio.run(seed(None))
+    else:
+        asyncio.run(seed(Path(argument) if argument else DEFAULT_PATH))

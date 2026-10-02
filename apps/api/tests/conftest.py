@@ -99,6 +99,7 @@ def fixtures() -> list:
     ]
     stores = [
         Store(id=IDS["open"], slug="open", name="Open Store", city_code="bishkek",
+              audiences=["women", "men"], address="ул. Киевская, 100",
               status=StoreStatus.ACTIVE),
         Store(id=IDS["blocked"], slug="blocked", name="Blocked Store", city_code="bishkek",
               status=StoreStatus.BLOCKED),

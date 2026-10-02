@@ -8,6 +8,7 @@ known passwords on a real server.
 """
 
 import asyncio
+from datetime import UTC, datetime
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import select
@@ -44,6 +45,8 @@ async def seed() -> None:
             else:
                 user.password_hash = hash_password(password)
             user.is_admin = is_admin
+            # Test accounts skip the confirmation email.
+            user.email_verified_at = user.email_verified_at or datetime.now(UTC)
             user.failed_logins = 0
             user.locked_until = None
             print(f"{'admin ' if is_admin else 'seller'} {email}")

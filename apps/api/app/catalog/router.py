@@ -73,6 +73,7 @@ def list_item_fields(product: Product, price_minor: int, price_varies: bool) -> 
             slug=product.store.slug,
             name=product.store.name,
             is_demo=product.store.is_demo,
+            avatar_url=storage.avatar_url(product.store.avatar_key),
         ),
         "title": product.title,
         "category": CategoryOut(code=product.category.code, name=display_name(product.category)),
@@ -164,6 +165,8 @@ async def get_product_detail(
                     if variant.color
                     else None
                 ),
+                height_min_cm=variant.height_min_cm,
+                height_max_cm=variant.height_max_cm,
                 price_minor=variant.price_override_minor or product.base_price_minor,
                 availability=effective_availability(variant),
                 availability_confirmed_at=variant.availability_confirmed_at,
@@ -174,13 +177,17 @@ async def get_product_detail(
 
 
 @router.get("/catalog/filters")
-async def get_catalog_filters(session: AsyncSession = Depends(get_session)) -> CatalogFilters:
-    visible = (
-        select(Product.id)
-        .join(Store, Store.id == Product.store_id)
-        .where(*visible_products())
-        .subquery()
+async def get_catalog_filters(
+    store: str | None = None, session: AsyncSession = Depends(get_session)
+) -> CatalogFilters:
+    """What the catalog can be filtered by. With `store` (a slug) it describes
+    that store's own range, for the store's page."""
+    visible_query = (
+        select(Product.id).join(Store, Store.id == Product.store_id).where(*visible_products())
     )
+    if store:
+        visible_query = visible_query.where(Store.slug == store)
+    visible = visible_query.subquery()
     in_catalog = Product.id.in_(select(visible.c.id))
 
     # First photo of the newest product in each group, used as the group's cover.

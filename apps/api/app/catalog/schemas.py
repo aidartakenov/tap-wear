@@ -22,6 +22,9 @@ class VariantOut(BaseModel):
     size_system: str | None
     size_label: str | None
     color: ColorOut | None
+    # The seller's recommended height for this size, in cm; null when not given.
+    height_min_cm: int | None
+    height_max_cm: int | None
     price_minor: int
     availability: Availability
     availability_confirmed_at: datetime | None

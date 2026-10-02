@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -19,6 +20,10 @@ from app.reference.router import router as reference_router
 from app.stores.router import router as stores_router
 
 settings = get_settings()
+
+# Show the application's own log messages (uvicorn configures only its own loggers).
+# Among other things, the console email backend writes messages here.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 
 @asynccontextmanager
@@ -61,3 +66,9 @@ for router in (
     reference_router,
 ):
     app.include_router(router, prefix=settings.api_v1_prefix)
+
+# Development-only helpers (the email outbox) exist only when running locally.
+if settings.environment == "local":
+    from app.dev_router import router as dev_router
+
+    app.include_router(dev_router, prefix=settings.api_v1_prefix)

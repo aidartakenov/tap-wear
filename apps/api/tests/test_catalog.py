@@ -129,6 +129,31 @@ def test_blocked_store_is_absent_from_stores(client):
     assert client.get("/api/v1/stores/blocked").status_code == 404
 
 
+def test_stores_are_filtered_by_audience_and_searched_by_name_or_address(client):
+    def slugs(**params) -> list[str]:
+        response = client.get("/api/v1/stores", params=params)
+        assert response.status_code == 200, response.text
+        return [store["slug"] for store in response.json()["items"]]
+
+    assert client.get("/api/v1/stores/open").json()["audiences"] == ["women", "men"]
+    assert slugs(audience="men") == ["open"]
+    assert slugs(audience="kids") == []
+    assert slugs(q="open") == ["open"]
+    assert slugs(q="киевская store") == ["open"]
+    assert slugs(q="100%") == []
+    assert slugs(audience="women", q="nothing") == []
+    assert client.get("/api/v1/stores", params={"audience": "unisex"}).status_code == 422
+
+
+def test_catalog_filters_can_describe_one_store(client):
+    own = client.get("/api/v1/catalog/filters", params={"store": "open"}).json()
+    hidden = client.get("/api/v1/catalog/filters", params={"store": "blocked"}).json()
+
+    assert own["product_count"] == 3
+    assert {category["code"] for category in own["categories"]} == {"jackets", "hoodies"}
+    assert hidden["product_count"] == 0 and hidden["categories"] == []
+
+
 def test_catalog_filters_describe_only_visible_products(client):
     filters = client.get("/api/v1/catalog/filters").json()
 

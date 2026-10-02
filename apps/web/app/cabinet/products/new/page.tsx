@@ -11,8 +11,10 @@ import { ErrorState, Loading } from '@/components/PageState';
 import { RequireAccount } from '@/components/RequireAccount';
 import { getReference } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { useApp } from '@/lib/context';
 
 function NewProduct() {
+  const { tr } = useApp();
   const storeId = useSearchParams().get('store') ?? '';
   const { data: reference, error, loading } = useApi((signal) => getReference(signal), []);
 
@@ -22,12 +24,12 @@ function NewProduct() {
         <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-2">
           <Link
             href={storeId ? `/cabinet/stores/${storeId}` : '/cabinet'}
-            aria-label="Назад к магазину"
+            aria-label={tr('Назад к магазину')}
             className={`${secondaryButton} !px-2.5`}
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <h1 className="text-xl font-bold text-gray-900">Новый товар</h1>
+          <h1 className="text-xl font-bold text-gray-900">{tr('Новый товар')}</h1>
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-4">

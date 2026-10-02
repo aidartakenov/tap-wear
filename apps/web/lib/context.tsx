@@ -2,13 +2,23 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import * as api from './api';
-import { LOCALE_COOKIE, Locale, Translate, countLabel, translator } from './i18n';
+import {
+  LOCALE_COOKIE,
+  Locale,
+  Translate,
+  TranslateSource,
+  countLabel,
+  sourceTranslator,
+  translator,
+} from './i18n';
 import { CatalogFilters, Me } from './types';
 
 interface AppContextType {
   // Interface language, its translate function and a helper for "5 товаров".
   locale: Locale;
   t: Translate;
+  // For seller and moderation pages: translates a Russian source string.
+  tr: TranslateSource;
   count: (count: number, noun: 'product' | 'store') => string;
   setLocale: (locale: Locale) => void;
   // What the catalog contains (audiences, categories, sizes, stores); null if the API is down.
@@ -46,6 +56,7 @@ export function AppProvider({
   // Set during render, so that requests made by child effects already use it.
   api.setApiLocale(locale);
   const t = translator(locale);
+  const tr = sourceTranslator(locale);
 
   const setLocale = (next: Locale) => {
     // Remembered for a year. The page is reloaded so that server-rendered parts
@@ -152,6 +163,7 @@ export function AppProvider({
       value={{
         locale,
         t,
+        tr,
         count: (count, noun) => countLabel(locale, count, noun),
         setLocale,
         catalog,

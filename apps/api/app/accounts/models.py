@@ -18,6 +18,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(300))
     name: Mapped[str] = mapped_column(String(100))
     locale: Mapped[str] = mapped_column(String(5), default="ru")
+    # Set when the person opens the link sent to this address. Required to open a store.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(default=True)
     # Platform administrator: reviews stores and products. Granted only from the command line.
     is_admin: Mapped[bool] = mapped_column(default=False)
@@ -55,4 +57,21 @@ class Favorite(Base):
     product_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("products.id", ondelete="CASCADE"), primary_key=True, index=True
     )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AccountToken(Base):
+    """A single-use link sent by email: confirm the address, or set a new password."""
+
+    __tablename__ = "account_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    purpose: Mapped[str] = mapped_column(String(20))
+    # Only a hash is stored; the token itself exists only in the emailed link.
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

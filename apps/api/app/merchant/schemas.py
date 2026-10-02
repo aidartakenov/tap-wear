@@ -2,12 +2,12 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from app.catalog.availability import Confirmation
 from app.catalog.models import Audience, Availability, ProductStatus
 from app.catalog.schemas import CategoryOut, ColorOut
-from app.stores.models import MemberRole, StoreStatus
+from app.stores.models import MemberRole, StoreAudience, StoreStatus
 
 Text100 = Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]
 Text200 = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
@@ -22,6 +22,8 @@ class StoreIn(BaseModel):
         Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None
     ) = None
     city_code: str
+    # Who the store sells for; at least one.
+    audiences: Annotated[list[StoreAudience], Field(min_length=1)]
     address: Text300 | None = None
     market: Text100 | None = None
     sector: Text100 | None = None
@@ -35,13 +37,21 @@ class StoreIn(BaseModel):
         None
     )
 
+    @field_validator("audiences")
+    @classmethod
+    def unique_in_fixed_order(cls, chosen: list[StoreAudience]) -> list[StoreAudience]:
+        return [audience for audience in StoreAudience if audience in chosen]
+
 
 class MerchantStoreOut(StoreIn):
+    # Stores opened before the field existed may still have none.
+    audiences: list[StoreAudience]
     id: uuid.UUID
     slug: str
     status: StoreStatus
     review_note: str | None
     role: MemberRole
+    avatar_url: str | None
 
 
 class MemberIn(BaseModel):
@@ -68,6 +78,19 @@ class VariantIn(BaseModel):
     price_override_minor: PriceMinor | None = None
     availability: Availability = Availability.UNKNOWN
     quantity: Annotated[int, Field(ge=0)] | None = None
+    # Optional recommended height of the person for this size, in cm. Give both
+    # or neither; the same number twice means a single height.
+    height_min_cm: Annotated[int, Field(ge=50, le=250)] | None = None
+    height_max_cm: Annotated[int, Field(ge=50, le=250)] | None = None
+
+    @model_validator(mode="after")
+    def height_range_is_complete_and_ordered(self):
+        low, high = self.height_min_cm, self.height_max_cm
+        if (low is None) != (high is None):
+            raise ValueError("Give both height_min_cm and height_max_cm, or neither")
+        if low is not None and low > high:
+            raise ValueError("height_min_cm cannot be greater than height_max_cm")
+        return self
 
 
 class ProductIn(BaseModel):
@@ -124,6 +147,8 @@ class MerchantVariantOut(BaseModel):
     price_override_minor: int | None
     availability: Availability
     quantity: int | None
+    height_min_cm: int | None
+    height_max_cm: int | None
     availability_confirmed_at: datetime | None
     # For "in stock" variants: whether the confirmation is fresh, due for a
     # reminder, or so old that buyers no longer see "in stock".

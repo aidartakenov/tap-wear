@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +24,7 @@ from app.catalog.schemas import CategoryOut, ColorOut
 from app.config import get_settings
 from app.database import get_session
 from app.errors import ApiError, not_found
+from app.locale import display_name
 from app.merchant.access import (
     PRODUCT_LOADING,
     ensure_editable,
@@ -50,7 +51,9 @@ from app.merchant.schemas import (
 from app.moderation.models import ModerationLog
 from app.rate_limit import rate_limit
 from app.reference.models import Category, City, Color
-from app.stores.models import MemberRole, Store, StoreMember, StoreStatus
+from app.stores.models import MemberRole, Store, StoreMember, StorePolicy, StoreStatus
+from app.stores.router import current_policy
+from app.stores.schemas import PolicyIn, PolicyOut
 
 router = APIRouter(prefix="/merchant", tags=["merchant"])
 settings = get_settings()
@@ -96,9 +99,11 @@ def store_out(store: Store, role: str) -> MerchantStoreOut:
         status=store.status,
         review_note=store.review_note,
         role=role,
+        avatar_url=storage.avatar_url(store.avatar_key),
         name=store.name,
         description=store.description,
         city_code=store.city_code,
+        audiences=store.audiences,
         address=store.address,
         market=store.market,
         sector=store.sector,
@@ -117,7 +122,7 @@ def product_out(product: Product) -> MerchantProductOut:
         store_id=product.store_id,
         title=product.title,
         description=product.description,
-        category=CategoryOut(code=product.category.code, name=product.category.name_ru),
+        category=CategoryOut(code=product.category.code, name=display_name(product.category)),
         audience=product.audience,
         base_price_minor=product.base_price_minor,
         currency=product.currency,
@@ -141,13 +146,15 @@ def product_out(product: Product) -> MerchantProductOut:
                 size_system=variant.size_system,
                 size_label=variant.size_label,
                 color=(
-                    ColorOut(code=variant.color.code, name=variant.color.name_ru)
+                    ColorOut(code=variant.color.code, name=display_name(variant.color))
                     if variant.color
                     else None
                 ),
                 price_override_minor=variant.price_override_minor,
                 availability=variant.availability_status,
                 quantity=variant.quantity,
+                height_min_cm=variant.height_min_cm,
+                height_max_cm=variant.height_max_cm,
                 availability_confirmed_at=variant.availability_confirmed_at,
                 confirmation=(
                     confirmation_state(variant)
@@ -187,6 +194,10 @@ async def my_stores(user: CurrentUser, db: Db) -> list[MerchantStoreOut]:
 
 @router.post("/stores", status_code=201)
 async def create_store(body: StoreIn, user: CurrentUser, db: Db) -> MerchantStoreOut:
+    if user.email_verified_at is None:
+        raise ApiError(
+            403, "email_not_verified", "Confirm your email address before opening a store"
+        )
     await check_reference(db, City, body.city_code, "city")
     # A new store is not public until an administrator has reviewed it.
     store = Store(
@@ -208,10 +219,7 @@ async def create_store(body: StoreIn, user: CurrentUser, db: Db) -> MerchantStor
 async def update_store(
     store_id: uuid.UUID, body: StoreIn, user: CurrentUser, db: Db
 ) -> MerchantStoreOut:
-    await owner_membership(db, user, store_id)
-    store = await db.get(Store, store_id)
-    if store.status == StoreStatus.BLOCKED:
-        raise ApiError(403, "store_blocked", "This store was blocked by an administrator")
+    store = await editable_store(db, user, store_id)
     await check_reference(db, City, body.city_code, "city")
     for field, value in body.model_dump().items():
         setattr(store, field, value)
@@ -224,6 +232,43 @@ async def update_store(
             )
         )
     await db.commit()
+    return store_out(store, MemberRole.OWNER)
+
+
+async def editable_store(db: AsyncSession, user: User, store_id: uuid.UUID) -> Store:
+    await owner_membership(db, user, store_id)
+    store = await db.get(Store, store_id)
+    if store.status == StoreStatus.BLOCKED:
+        raise ApiError(403, "store_blocked", "This store was blocked by an administrator")
+    return store
+
+
+@router.put(
+    "/stores/{store_id}/avatar",
+    dependencies=[Depends(rate_limit("uploads", limit=30))],
+)
+async def upload_avatar(
+    store_id: uuid.UUID, file: UploadFile, user: CurrentUser, db: Db
+) -> MerchantStoreOut:
+    store = await editable_store(db, user, store_id)
+    raw = await file.read(settings.upload_max_bytes + 1)
+    image = storage.process_image(raw, square_side=storage.AVATAR_SIDE)
+    previous = store.avatar_key
+    store.avatar_key = await storage.store_avatar(store.id, image)
+    await db.commit()
+    if previous:
+        await storage.remove_object(previous)
+    return store_out(store, MemberRole.OWNER)
+
+
+@router.delete("/stores/{store_id}/avatar")
+async def delete_avatar(store_id: uuid.UUID, user: CurrentUser, db: Db) -> MerchantStoreOut:
+    store = await editable_store(db, user, store_id)
+    previous = store.avatar_key
+    store.avatar_key = None
+    await db.commit()
+    if previous:
+        await storage.remove_object(previous)
     return store_out(store, MemberRole.OWNER)
 
 
@@ -281,6 +326,30 @@ async def remove_member(store_id: uuid.UUID, user_id: uuid.UUID, user: CurrentUs
     await db.commit()
 
 
+@router.get("/stores/{store_id}/policy")
+async def get_policy(store_id: uuid.UUID, user: CurrentUser, db: Db) -> PolicyOut | None:
+    await membership(db, user, store_id)
+    return await current_policy(db, store_id)
+
+
+@router.put("/stores/{store_id}/policy")
+async def save_policy(store_id: uuid.UUID, body: PolicyIn, user: CurrentUser, db: Db) -> PolicyOut:
+    """Save the store's delivery and return conditions as a new version."""
+    await owner_membership(db, user, store_id)
+    # Locking the store row makes concurrent saves take turns, so version numbers never clash.
+    await db.execute(select(Store.id).where(Store.id == store_id).with_for_update())
+    latest = await db.scalar(
+        select(func.max(StorePolicy.version)).where(StorePolicy.store_id == store_id)
+    )
+    db.add(
+        StorePolicy(
+            store_id=store_id, version=(latest or 0) + 1, created_by=user.id, **body.model_dump()
+        )
+    )
+    await db.commit()
+    return await current_policy(db, store_id)
+
+
 # --- Products ---------------------------------------------------------------
 
 
@@ -299,6 +368,8 @@ async def apply_variants(db: AsyncSession, product: Product, incoming: list[Vari
         variant.size_label = item.size_label or None
         variant.color_code = item.color
         variant.price_override_minor = item.price_override_minor
+        variant.height_min_cm = item.height_min_cm
+        variant.height_max_cm = item.height_max_cm
         variant.quantity = item.quantity
         variant.stock_mode = StockMode.EXACT if item.quantity is not None else StockMode.MANUAL
         # With exact stock the status follows the quantity.
@@ -524,6 +595,8 @@ async def copy_product(product_id: uuid.UUID, user: CurrentUser, db: Db) -> Merc
                 size_label=variant.size_label,
                 color_code=variant.color_code,
                 price_override_minor=variant.price_override_minor,
+                height_min_cm=variant.height_min_cm,
+                height_max_cm=variant.height_max_cm,
                 position=variant.position,
             )
             for variant in source.variants

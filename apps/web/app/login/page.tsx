@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { Field, FormError, inputClass, primaryButton } from '@/components/form';
@@ -98,6 +99,11 @@ export default function LoginPage() {
             />
           </Field>
           <FormError error={error} />
+          {mode === 'login' && (
+            <Link href="/forgot-password" className="block text-sm text-blue-600 hover:underline">
+              {t('login.forgot')}
+            </Link>
+          )}
           <button type="submit" disabled={busy} className={`${primaryButton} w-full`}>
             {t(busy ? 'login.wait' : mode === 'login' ? 'nav.signIn' : 'login.create')}
           </button>

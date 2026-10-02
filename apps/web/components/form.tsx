@@ -4,7 +4,7 @@ import { ReactNode } from 'react';
 import { ApiError } from '@/lib/api';
 import { statusColors } from '@/lib/catalog';
 import { useApp } from '@/lib/context';
-import { Translate, optionalKey } from '@/lib/i18n';
+import { Translate, TranslateSource, optionalKey } from '@/lib/i18n';
 
 export const inputClass =
   'w-full h-10 rounded-lg border border-gray-300 bg-white px-3 text-base md:text-sm text-gray-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 disabled:bg-gray-100';
@@ -12,13 +12,13 @@ export const inputClass =
 export const textareaClass = inputClass.replace('h-10', 'min-h-24 py-2');
 
 export const primaryButton =
-  'inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 h-10 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60';
+  'inline-flex items-center justify-center gap-2 rounded-full bg-gray-900 px-5 h-10 text-sm font-semibold text-white transition-colors hover:bg-black active:scale-[0.98] disabled:opacity-60';
 
 export const secondaryButton =
-  'inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 h-10 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60';
+  'inline-flex items-center justify-center gap-2 rounded-full border border-gray-300 bg-white px-5 h-10 text-sm font-medium text-gray-900 transition-colors hover:border-gray-900 disabled:opacity-60';
 
 export const dangerButton =
-  'inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 h-10 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60';
+  'inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-5 h-10 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-60';
 
 export function Field({
   label,
@@ -68,27 +68,28 @@ const problems: Record<string, string> = {
   'Add at least one photo': 'Добавьте хотя бы одно фото',
 };
 
-export function errorText(error: unknown, t?: Translate): string {
+export function errorText(error: unknown, t?: Translate, tr?: TranslateSource): string {
+  const source = tr ?? ((text: string) => text);
   if (!(error instanceof ApiError)) return t ? t('error.unexpected') : 'Что-то пошло не так';
   // Codes a buyer can meet are in the dictionaries; seller-only ones are Russian for now.
   const key = optionalKey(`error.${error.code}`);
   const base =
     (t && key ? t(key) : undefined) ??
-    messages[error.code] ??
+    (messages[error.code] ? source(messages[error.code]) : undefined) ??
     (t ? t('error.generic') : 'Не удалось выполнить действие');
   if (error.code === 'not_ready' && Array.isArray(error.details)) {
-    const list = error.details.map((detail) => problems[detail.problem] ?? detail.problem);
+    const list = error.details.map((detail) => source(problems[detail.problem] ?? detail.problem));
     return `${base}: ${list.join('; ').toLowerCase()}`;
   }
   return base;
 }
 
 export function FormError({ error }: { error: unknown }) {
-  const { t } = useApp();
+  const { t, tr } = useApp();
   if (!error) return null;
   return (
     <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-      {errorText(error, t)}
+      {errorText(error, t, tr)}
     </p>
   );
 }

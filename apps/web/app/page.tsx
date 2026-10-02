@@ -1,9 +1,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Camera, MapPin } from 'lucide-react';
+import { ArrowUpRight, Camera, MapPin } from 'lucide-react';
+import { ActionLink } from '@/components/ActionLink';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { CategoryIcon } from '@/components/CategoryIcon';
 import { DemoNotice } from '@/components/DemoNotice';
 import { ProductShelf } from '@/components/ProductShelf';
+import { StoreAvatar } from '@/components/StoreAvatar';
 import { getCatalogFilters, getProducts, getStores } from '@/lib/api';
 import { cookies } from 'next/headers';
 import { catalogHref } from '@/lib/catalog';
@@ -14,6 +17,7 @@ import { Audience, FilterState } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 const SHELF_SIZE = 12;
+const TILE_AUDIENCES: Audience[] = ['women', 'men', 'kids'];
 
 // Which products make a good tile photo. This is a presentation choice for the
 // demo catalog (photos with the garment worn, framed from the top); without a
@@ -27,7 +31,7 @@ const coverPicks: Partial<Record<Audience, Partial<FilterState>>> = {
 async function loadHome(locale: Locale) {
   const [catalog, stores, mixed] = await Promise.all([
     getCatalogFilters(undefined, locale),
-    getStores(undefined, locale),
+    getStores({}, undefined, locale),
     getProducts({ limit: SHELF_SIZE }, undefined, locale),
   ]);
   const shelves = await Promise.all(
@@ -69,23 +73,30 @@ export default async function HomePage() {
   const { catalog, stores, mixed, shelves } = home;
 
   const hasDemoData = stores.some((store) => store.is_demo);
-  const tiles = shelves.filter((shelf) => shelf.cover);
+  // The big tiles are always the three main choices. Other audiences (unisex)
+  // stay reachable from the menu and get a shelf further down the page.
+  const tiles = shelves.filter(
+    (shelf) => shelf.cover && TILE_AUDIENCES.includes(shelf.audience)
+  );
   const heroImages = tiles.map((tile) => tile.cover!).slice(0, 3);
 
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <main className="mx-auto max-w-6xl px-4 py-4 md:py-6 space-y-8 md:space-y-12">
-        <section id="audience" aria-label={t('filter.audience')} className="scroll-mt-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+        <section id="audience" aria-label={t('filter.audience')} className="scroll-mt-4 md:pb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">
             {tiles.map((tile, index) => (
               <Link
                 key={tile.audience}
                 href={catalogHref({ audience: tile.audience })}
-                className={`group relative overflow-hidden rounded-2xl bg-gray-200 md:col-span-1 md:aspect-[4/5] ${
+                className={`notch-tile group bg-gray-200 md:col-span-1 md:aspect-[4/5] ${
                   // On phones two tiles share a row; an odd last tile takes the full width.
                   index === tiles.length - 1 && tiles.length % 2 === 1
                     ? 'col-span-2 aspect-[2/1]'
                     : 'aspect-[3/4]'
+                } ${
+                  // On wide screens the middle tile sits lower, so the row is not a flat strip.
+                  index % 3 === 1 ? 'md:translate-y-8' : ''
                 }`}
               >
                 <Image
@@ -95,18 +106,29 @@ export default async function HomePage() {
                   sizes="(max-width: 768px) 100vw, 380px"
                   // Above the fold on every screen, so load without waiting for scroll.
                   priority
-                  className="object-cover object-top transition-transform duration-300 group-hover:scale-105"
+                  className="object-cover object-top transition-transform duration-500 ease-out group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-4 md:p-6 text-white">
-                  <h2 className="text-2xl md:text-3xl font-extrabold">{t(`audience.${tile.audience}`)}</h2>
-                  <p className="mt-1 text-xs md:text-sm text-gray-200">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent" />
+
+                <span className="absolute left-3 top-3 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md md:left-4 md:top-4">
+                  {countLabel(locale, tile.count, 'product')}
+                </span>
+
+                <div className="absolute bottom-0 left-0 right-16 p-4 text-white md:right-20 md:p-6">
+                  <h2 className="text-2xl font-extrabold leading-none tracking-tight md:text-4xl">
+                    {t(`audience.${tile.audience}`)}
+                  </h2>
+                  <p className="mt-1.5 text-xs text-gray-200 md:text-sm">
                     {t(`home.tagline.${tile.audience}`)}
                   </p>
-                  <p className="mt-2 md:mt-3 text-xs md:text-sm font-semibold text-white">
-                    {countLabel(locale, tile.count, 'product')}
-                  </p>
                 </div>
+
+                {/* The corner bitten out of the photo, holding the round arrow button. */}
+                <span className="notch" aria-hidden>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-900 text-white transition-all duration-300 ease-out group-hover:rotate-45 group-hover:bg-blue-600 md:h-14 md:w-14">
+                    <ArrowUpRight className="h-5 w-5 md:h-6 md:w-6" strokeWidth={2.5} />
+                  </span>
+                </span>
               </Link>
             ))}
           </div>
@@ -125,20 +147,12 @@ export default async function HomePage() {
                 {t('home.heroText')}
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  href="/search"
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-100"
-                >
-                  <Camera className="w-4 h-4" />
+                <ActionLink href="/search" variant="light" icon={Camera}>
                   {t('nav.photoSearch')}
-                </Link>
-                <Link
-                  href="/catalog"
-                  className="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
-                >
+                </ActionLink>
+                <ActionLink href="/catalog" variant="ghost">
                   {t('home.openCatalog')}
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
+                </ActionLink>
               </div>
               <p className="mt-6 text-xs text-gray-400">
                 {countLabel(locale, catalog.product_count, 'product')} ·{' '}
@@ -162,29 +176,31 @@ export default async function HomePage() {
         </section>
 
         <section id="categories" className="scroll-mt-4">
-          <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-3">{t('home.categories')}</h2>
-          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-6 md:overflow-visible md:px-0 [scrollbar-width:thin]">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <h2 className="text-lg md:text-xl font-bold text-gray-900">{t('home.categories')}</h2>
+            <Link href="/catalog" className="text-sm font-medium text-blue-600 hover:underline">
+              {t('nav.allCatalog')}
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
             {catalog.categories.slice(0, 12).map((category) => (
               <Link
                 key={category.code}
                 href={catalogHref({ category: category.code })}
-                className="group w-24 md:w-auto shrink-0 text-center"
+                className="group flex items-center gap-3 rounded-2xl border border-gray-200 bg-white p-2.5 transition-all hover:border-gray-900 hover:shadow-md md:p-3"
               >
-                <div className="relative aspect-square overflow-hidden rounded-xl bg-gray-200">
-                  {category.cover_image && (
-                    <Image
-                      src={category.cover_image}
-                      alt=""
-                      fill
-                      sizes="(max-width: 768px) 96px, 180px"
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  )}
-                </div>
-                <p className="mt-2 text-xs md:text-sm font-medium text-gray-900 leading-tight">
-                  {category.name}
-                </p>
-                <p className="text-xs text-gray-500">{category.count}</p>
+                {/* A drawing of the garment type instead of a random product photo. */}
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-900 transition-colors group-hover:bg-gray-900 group-hover:text-white md:h-14 md:w-14">
+                  <CategoryIcon code={category.code} className="h-7 w-7 md:h-8 md:w-8" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold leading-tight text-gray-900">
+                    {category.name}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-gray-500">
+                    {countLabel(locale, category.count, 'product')}
+                  </span>
+                </span>
               </Link>
             ))}
           </div>
@@ -216,7 +232,10 @@ export default async function HomePage() {
                     </div>
                   ))}
                 </div>
-                <h3 className="mt-3 font-semibold text-gray-900">{store.name}</h3>
+                <div className="mt-3 flex items-center gap-2">
+                  <StoreAvatar name={store.name} url={store.avatar_url} className="h-8 w-8 text-xs" />
+                  <h3 className="min-w-0 truncate font-semibold text-gray-900">{store.name}</h3>
+                </div>
                 {store.address && (
                   <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
                     <MapPin className="w-3.5 h-3.5 shrink-0" />

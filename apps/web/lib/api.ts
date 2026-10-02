@@ -7,6 +7,8 @@ import {
   Member,
   MerchantProduct,
   MerchantStore,
+  Policy,
+  PolicyInput,
   ProductDetail,
   ProductInput,
   ProductPage,
@@ -20,7 +22,12 @@ import {
   VariantInput,
 } from './types';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1';
+const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1';
+
+// In the browser the API is reached by its public address. Pages rendered on
+// the server call it directly inside the private network when API_INTERNAL_URL is set.
+export const API_URL =
+  typeof window === 'undefined' ? (process.env.API_INTERNAL_URL ?? PUBLIC_API_URL) : PUBLIC_API_URL;
 
 export interface ErrorDetail {
   field: string;
@@ -151,16 +158,25 @@ export function getProduct(id: string, signal?: AbortSignal) {
   return get<ProductDetail>(`/products/${encodeURIComponent(id)}`, undefined, signal);
 }
 
-export function getStores(signal?: AbortSignal, locale?: string) {
-  return get<{ items: Store[] }>('/stores', undefined, signal, locale);
+export function getStores(
+  filter: { audience?: string; query?: string } = {},
+  signal?: AbortSignal,
+  locale?: string
+) {
+  const params = new URLSearchParams();
+  if (filter.audience) params.set('audience', filter.audience);
+  if (filter.query?.trim()) params.set('q', filter.query.trim());
+  return get<{ items: Store[] }>('/stores', params, signal, locale);
 }
 
 export function getStore(slug: string, signal?: AbortSignal) {
   return get<Store>(`/stores/${encodeURIComponent(slug)}`, undefined, signal);
 }
 
-export function getCatalogFilters(signal?: AbortSignal, locale?: string) {
-  return get<CatalogFilters>('/catalog/filters', undefined, signal, locale);
+// With a store slug the result describes that store's own range.
+export function getCatalogFilters(signal?: AbortSignal, locale?: string, store?: string) {
+  const params = store ? new URLSearchParams({ store }) : undefined;
+  return get<CatalogFilters>('/catalog/filters', params, signal, locale);
 }
 
 // --- Accounts -----------------------------------------------------------------
@@ -172,6 +188,12 @@ export const register = (email: string, password: string, name: string) =>
   send<Me>('POST', '/auth/register', { email, password, name });
 export const logout = () => send<void>('POST', '/auth/logout');
 
+export const verifyEmail = (token: string) => send<void>('POST', '/auth/verify-email', { token });
+export const resendVerification = () => send<void>('POST', '/auth/verify-email/resend');
+export const forgotPassword = (email: string) =>
+  send<void>('POST', '/auth/password/forgot', { email });
+export const resetPassword = (token: string, newPassword: string) =>
+  send<void>('POST', '/auth/password/reset', { token, new_password: newPassword });
 export const updateProfile = (name: string) => send<Me>('PATCH', '/auth/me', { name });
 export const changePassword = (currentPassword: string, newPassword: string) =>
   send<void>('POST', '/auth/password', {
@@ -202,8 +224,20 @@ export const createStore = (store: StoreInput) =>
 export const updateStore = (id: string, store: StoreInput) =>
   send<MerchantStore>('PATCH', `/merchant/stores/${id}`, store);
 
+export const getPolicy = (storeId: string, signal?: AbortSignal) =>
+  get<Policy | null>(`/merchant/stores/${storeId}/policy`, undefined, signal);
+export const savePolicy = (storeId: string, policy: PolicyInput) =>
+  send<Policy>('PUT', `/merchant/stores/${storeId}/policy`, policy);
+
 export const getMembers = (storeId: string, signal?: AbortSignal) =>
   get<Member[]>(`/merchant/stores/${storeId}/members`, undefined, signal);
+export function uploadStoreAvatar(storeId: string, file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  return send<MerchantStore>('PUT', `/merchant/stores/${storeId}/avatar`, form);
+}
+export const deleteStoreAvatar = (storeId: string) =>
+  send<MerchantStore>('DELETE', `/merchant/stores/${storeId}/avatar`);
 export const addMember = (storeId: string, email: string) =>
   send<Member>('POST', `/merchant/stores/${storeId}/members`, { email });
 export const removeMember = (storeId: string, userId: string) =>

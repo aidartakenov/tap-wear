@@ -8,6 +8,7 @@ The password is asked for interactively, so it never ends up in the shell histor
 import asyncio
 import getpass
 import sys
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -24,6 +25,7 @@ async def create_admin(email: str, password: str | None) -> None:
             user = User(email=email, password_hash=hash_password(password), name="Администратор")
             db.add(user)
         user.is_admin = True
+        user.email_verified_at = user.email_verified_at or datetime.now(UTC)
         await db.commit()
     await engine.dispose()
     print(f"{email} is now an administrator")

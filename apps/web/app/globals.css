@@ -57,3 +57,48 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Audience tiles on the home page: a rounded photo card with a corner "bitten out"
+   for a round arrow button. The notch is painted in the page background colour, and
+   two small concave pieces round the photo where it meets the notch. */
+@layer components {
+  .notch-tile {
+    --notch-radius: 26px;
+    --page-bg: #f9fafb; /* must match the body background (gray-50) */
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--notch-radius);
+  }
+
+  .notch {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    padding: 9px 0 0 9px;
+    background: var(--page-bg);
+    border-top-left-radius: var(--notch-radius);
+  }
+
+  .notch::before,
+  .notch::after {
+    content: "";
+    position: absolute;
+    width: var(--notch-radius);
+    height: var(--notch-radius);
+    background: radial-gradient(
+      circle at 0 0,
+      transparent var(--notch-radius),
+      var(--page-bg) calc(var(--notch-radius) + 0.5px)
+    );
+  }
+
+  .notch::before {
+    right: 0;
+    bottom: 100%;
+  }
+
+  .notch::after {
+    right: 100%;
+    bottom: 0;
+  }
+}

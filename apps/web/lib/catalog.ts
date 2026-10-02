@@ -5,6 +5,26 @@ import { Audience, Availability, FilterState, SortOrder } from './types';
 
 export const ALL = 'all';
 
+// How each reference colour is drawn as a small dot next to its name.
+export const colorSwatches: Record<string, string> = {
+  black: '#111827',
+  white: '#ffffff',
+  gray: '#9ca3af',
+  beige: '#e8dcc4',
+  brown: '#7c4a21',
+  red: '#dc2626',
+  burgundy: '#7f1d2d',
+  orange: '#f97316',
+  yellow: '#facc15',
+  green: '#16a34a',
+  khaki: '#8a8a5c',
+  light_blue: '#7dd3fc',
+  blue: '#1d4ed8',
+  purple: '#7c3aed',
+  pink: '#f9a8d4',
+  multicolor: 'conic-gradient(#dc2626, #facc15, #16a34a, #1d4ed8, #7c3aed, #dc2626)',
+};
+
 export const audienceLabels: Record<Audience, string> = {
   women: 'Женщинам',
   men: 'Мужчинам',
@@ -168,3 +188,20 @@ export const reportReasonLabels = {
   inappropriate: 'Неподходящее содержимое',
   other: 'Другое',
 } as const;
+
+// Height of a person for a size, as typed by a seller: "160" or "160-170" (cm).
+// Returns [min, max], null for an empty field, or 'invalid'.
+export function parseHeight(text: string): [number, number] | null | 'invalid' {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const match = trimmed.match(/^(\d{2,3})(?:\s*[-–—]\s*(\d{2,3}))?$/);
+  if (!match) return 'invalid';
+  const low = Number(match[1]);
+  const high = Number(match[2] ?? match[1]);
+  return low >= 50 && high <= 250 && low <= high ? [low, high] : 'invalid';
+}
+
+// 160, 160 -> "160"; 165, 175 -> "165–175".
+export function formatHeight(min: number, max: number): string {
+  return min === max ? String(min) : `${min}–${max}`;
+}

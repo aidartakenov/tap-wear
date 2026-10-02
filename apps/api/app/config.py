@@ -31,6 +31,17 @@ class Settings(BaseSettings):
     login_max_failures: int = Field(default=5, gt=0)
     login_lock_minutes: int = Field(default=15, gt=0)
 
+    # Email. "console" writes messages to the log instead of sending them.
+    email_backend: Literal["console", "smtp"] = "console"
+    email_from: str = "TapWear <no-reply@tapwear.local>"
+    smtp_host: str = "localhost"
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_starttls: bool = True
+    # Address of the website, used for links in emails.
+    web_base_url: str = "http://localhost:3000"
+
     # Per-address request limits on sign-in, reports, events and uploads.
     rate_limit_enabled: bool = True
 

@@ -3,16 +3,17 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Camera, Heart, Search, Store, User } from 'lucide-react';
+import { Bookmark, Camera, CircleUserRound, Search, Store } from 'lucide-react';
+import { ActionLink } from '@/components/ActionLink';
 import { catalogHref } from '@/lib/catalog';
 import { Key, LOCALES, localeNames } from '@/lib/i18n';
 import { useApp } from '@/lib/context';
 import { cn } from '@/lib/utils';
 
-const desktopLinks: { href: string; label: Key; icon: typeof User }[] = [
+const desktopLinks: { href: string; label: Key; icon: typeof Search }[] = [
   { href: '/stores', label: 'nav.stores', icon: Store },
-  { href: '/favorites', label: 'nav.favorites', icon: Heart },
-  { href: '/profile', label: 'nav.profile', icon: User },
+  { href: '/favorites', label: 'nav.favorites', icon: Bookmark },
+  { href: '/profile', label: 'nav.profile', icon: CircleUserRound },
 ];
 
 export function SiteHeader() {
@@ -35,7 +36,7 @@ export function SiteHeader() {
           Tap<span className="text-blue-600">Wear</span>
         </Link>
 
-        <form onSubmit={submitSearch} role="search" className="relative flex-1 md:max-w-md md:mr-auto">
+        <form onSubmit={submitSearch} role="search" className="relative min-w-40 flex-1 md:max-w-md md:mr-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="search"
@@ -79,7 +80,10 @@ export function SiteHeader() {
               )}
             >
               <Icon className="w-4 h-4" />
-              {href === '/profile' ? t(me ? 'nav.cabinet' : 'nav.signIn') : t(label)}
+              {/* Icons only on tablet widths, where the full labels do not fit. */}
+              <span className="max-lg:sr-only">
+                {href === '/profile' ? t(me ? 'nav.cabinet' : 'nav.signIn') : t(label)}
+              </span>
               {href === '/favorites' && favorites.length > 0 && (
                 <span className="rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
                   {favorites.length}
@@ -87,13 +91,9 @@ export function SiteHeader() {
               )}
             </Link>
           ))}
-          <Link
-            href="/search"
-            className="ml-2 flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-          >
-            <Camera className="w-4 h-4" />
+          <ActionLink href="/search" icon={Camera} size="sm" className="ml-2">
             {t('nav.photoSearch')}
-          </Link>
+          </ActionLink>
         </nav>
       </div>
 
@@ -131,11 +131,16 @@ export function SiteHeader() {
         {audiences.length > 0 && (
           <span className="mx-1 h-4 w-px shrink-0 bg-gray-300" aria-hidden />
         )}
-        {categories.slice(0, 6).map((category) => (
+        {categories.slice(0, 6).map((category, index) => (
           <Link
             key={category.code}
             href={catalogHref({ category: category.code })}
-            className="shrink-0 px-3 py-2.5 text-sm text-gray-600 border-b-2 border-transparent hover:border-gray-400 hover:text-gray-900"
+            className={cn(
+              'shrink-0 px-3 py-2.5 text-sm text-gray-600 border-b-2 border-transparent hover:border-gray-400 hover:text-gray-900',
+              // Phones scroll this row sideways; wider screens cannot (the hover menus
+              // need visible overflow), so narrower ones show fewer shortcuts.
+              index >= 4 ? 'md:max-xl:hidden' : index >= 1 && 'md:max-lg:hidden'
+            )}
           >
             {category.name}
           </Link>

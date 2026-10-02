@@ -1,4 +1,5 @@
 import { ky } from './ky';
+import { kySeller } from './kySeller';
 import { Key, ru } from './ru';
 
 export type { Key };
@@ -21,6 +22,18 @@ export function translator(locale: Locale): Translate {
   const dictionary = dictionaries[locale];
   return (key, values) => {
     const text = dictionary[key] ?? ru[key];
+    if (!values) return text;
+    return text.replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? ''));
+  };
+}
+
+export type TranslateSource = (russian: string, values?: Record<string, string | number>) => string;
+
+// Seller and moderation pages are written in Russian in the code; this returns the
+// Kyrgyz text for a Russian source string (or the Russian itself), filling {placeholders}.
+export function sourceTranslator(locale: Locale): TranslateSource {
+  return (russian, values) => {
+    const text = (locale === 'ky' ? kySeller[russian] : undefined) ?? russian;
     if (!values) return text;
     return text.replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? ''));
   };

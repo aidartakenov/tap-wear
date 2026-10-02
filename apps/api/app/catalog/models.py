@@ -117,6 +117,12 @@ class ProductVariant(Base):
             name="availability_valid",
         ),
         CheckConstraint("stock_mode IN ('manual', 'exact')", name="stock_mode_valid"),
+        CheckConstraint(
+            "(height_min_cm IS NULL AND height_max_cm IS NULL) OR "
+            "(height_min_cm BETWEEN 50 AND 250 AND height_max_cm BETWEEN 50 AND 250 "
+            "AND height_min_cm <= height_max_cm)",
+            name="height_range_valid",
+        ),
         # The same colour, size and size system may not repeat within a product.
         # NULLs count as equal, so a product has at most one "no size, no colour" variant.
         UniqueConstraint(
@@ -138,6 +144,10 @@ class ProductVariant(Base):
     size_system: Mapped[str | None] = mapped_column(String(20))
     size_label: Mapped[str | None] = mapped_column(String(30))
     color_code: Mapped[str | None] = mapped_column(ForeignKey("colors.code"))
+    # Optional: the height of a person this size is meant for, as stated by the seller.
+    # A single height is stored as an equal minimum and maximum.
+    height_min_cm: Mapped[int | None] = mapped_column()
+    height_max_cm: Mapped[int | None] = mapped_column()
     sku: Mapped[str | None] = mapped_column(String(100))
     price_override_minor: Mapped[int | None] = mapped_column(BigInteger)
     stock_mode: Mapped[str] = mapped_column(String(10), default=StockMode.MANUAL)

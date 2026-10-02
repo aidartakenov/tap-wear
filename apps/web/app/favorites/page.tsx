@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Bookmark } from 'lucide-react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { FormError, primaryButton } from '@/components/form';
 import { ErrorState, ProductGridSkeleton } from '@/components/PageState';
@@ -67,7 +68,7 @@ export default function FavoritesPage() {
           <ErrorState error={error} />
         ) : ids.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-6xl mb-4">❤️</div>
+            <Bookmark className="mx-auto mb-4 h-14 w-14 text-gray-300" strokeWidth={1.5} />
             <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('favorites.empty')}</h2>
             <p className="text-gray-600">{t('favorites.emptyHint')}</p>
           </div>

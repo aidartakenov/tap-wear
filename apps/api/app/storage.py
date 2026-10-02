@@ -19,6 +19,8 @@ settings = get_settings()
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
 # Longest side of the stored photo. Larger uploads are scaled down.
 MAX_SIDE = 2000
+# Store avatars are stored as a square of at most this side.
+AVATAR_SIDE = 512
 
 
 @dataclass
@@ -29,8 +31,11 @@ class ProcessedImage:
     height: int
 
 
-def process_image(raw: bytes) -> ProcessedImage:
+def process_image(raw: bytes, square_side: int | None = None) -> ProcessedImage:
     """Validate an upload and return a clean JPEG.
+
+    With `square_side` the picture is cropped around its centre to a square of
+    at most that side (used for store avatars).
 
     The file name and the declared content type are never trusted: the bytes
     must decode as a JPEG, PNG or WebP image. The picture is re-encoded, which
@@ -56,7 +61,11 @@ def process_image(raw: bytes) -> ProcessedImage:
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as error:
         raise unsupported from error
 
-    image.thumbnail((MAX_SIDE, MAX_SIDE))
+    if square_side:
+        side = min(square_side, image.width, image.height)
+        image = ImageOps.fit(image, (side, side))
+    else:
+        image.thumbnail((MAX_SIDE, MAX_SIDE))
     output = io.BytesIO()
     image.save(output, format="JPEG", quality=85, optimize=True)
     data = output.getvalue()
@@ -111,15 +120,27 @@ def _remove(key: str) -> None:
     client().remove_object(ensure_assets_bucket(), key)
 
 
-async def store_product_image(product_id: uuid.UUID, image: ProcessedImage) -> str:
-    """Save a processed photo and return its object key. The key is generated here,
-    never taken from the uploaded file name."""
-    key = f"products/{product_id}/{uuid.uuid4()}.jpg"
+async def _store(key: str, image: ProcessedImage) -> str:
     try:
         await asyncio.to_thread(_put, key, image.data)
     except Exception as error:
         raise ApiError(503, "storage_unavailable", "Photo storage is unavailable") from error
     return key
+
+
+async def store_product_image(product_id: uuid.UUID, image: ProcessedImage) -> str:
+    """Save a processed photo and return its object key. The key is generated here,
+    never taken from the uploaded file name."""
+    return await _store(f"products/{product_id}/{uuid.uuid4()}.jpg", image)
+
+
+async def store_avatar(store_id: uuid.UUID, image: ProcessedImage, name: str | None = None) -> str:
+    """Save a store avatar. Every upload gets a new key, so browsers never show a cached old one.
+
+    The demo catalog passes `name` (derived from the picture's content), so loading
+    it again reuses the same object instead of piling up copies.
+    """
+    return await _store(f"stores/{store_id}/avatar-{name or uuid.uuid4()}.jpg", image)
 
 
 async def remove_object(key: str) -> None:
@@ -131,6 +152,10 @@ async def remove_object(key: str) -> None:
 
 def public_url(object_key: str) -> str:
     return f"{settings.storage_public_url}/{settings.minio_bucket_assets}/{object_key}"
+
+
+def avatar_url(object_key: str | None) -> str | None:
+    return public_url(object_key) if object_key else None
 
 
 def image_url(object_key: str | None, external_url: str | None) -> str | None:

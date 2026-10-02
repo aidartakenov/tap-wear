@@ -6,15 +6,40 @@ export type SortOrder = 'default' | 'price_asc' | 'price_desc';
 
 // The shapes below mirror the API responses (see /api/v1/docs), field for field.
 
+// Who a store sells for. A store may pick several.
+export type StoreAudience = 'women' | 'men' | 'kids';
+export const STORE_AUDIENCES: StoreAudience[] = ['men', 'women', 'kids'];
+
 export interface StoreBrief {
   id: string;
   slug: string;
   name: string;
   // Demo stores are imported samples, not real participants.
   is_demo: boolean;
+  // The store's own picture; null when it has not uploaded one.
+  avatar_url: string | null;
+}
+
+export interface PolicyInput {
+  pickup_available: boolean;
+  delivery_available: boolean;
+  delivery_areas: string | null;
+  // Minor units (tyiyn). null: the fee must be asked. 0: free.
+  delivery_fee_minor: number | null;
+  delivery_time: string | null;
+  try_on_at_delivery: boolean;
+  payment_methods: string | null;
+  return_days: number | null;
+  return_terms: string | null;
+}
+
+export interface Policy extends PolicyInput {
+  version: number;
+  updated_at: string;
 }
 
 export interface Store extends StoreBrief {
+  audiences: StoreAudience[];
   description: string | null;
   city: { code: string; name: string };
   address: string | null;
@@ -26,6 +51,7 @@ export interface Store extends StoreBrief {
   whatsapp: string | null;
   instagram: string | null;
   website: string | null;
+  policy: Policy | null;
   product_count: number;
   categories: string[];
   preview_images: string[];
@@ -60,6 +86,9 @@ export interface Variant {
   size_system: string | null;
   size_label: string | null;
   color: Color | null;
+  // The seller's recommended height for this size, in cm; null when not given.
+  height_min_cm: number | null;
+  height_max_cm: number | null;
   price_minor: number;
   availability: Availability;
   availability_confirmed_at: string | null;
@@ -133,6 +162,8 @@ export interface Me {
   email: string;
   name: string;
   is_admin: boolean;
+  // False until the person opens the link sent to their address.
+  email_verified: boolean;
   csrf_token: string;
   memberships: Membership[];
 }
@@ -141,6 +172,7 @@ export interface StoreInput {
   name: string;
   description: string | null;
   city_code: string;
+  audiences: StoreAudience[];
   address: string | null;
   market: string | null;
   sector: string | null;
@@ -158,6 +190,7 @@ export interface MerchantStore extends StoreInput {
   status: StoreStatus;
   review_note: string | null;
   role: MemberRole;
+  avatar_url: string | null;
 }
 
 export interface Member {
@@ -175,6 +208,9 @@ export interface VariantInput {
   price_override_minor: number | null;
   availability: Availability;
   quantity: number | null;
+  // Optional recommended height for this size, in cm. Both or neither.
+  height_min_cm: number | null;
+  height_max_cm: number | null;
 }
 
 export interface MerchantVariant extends Omit<VariantInput, 'color' | 'id'> {

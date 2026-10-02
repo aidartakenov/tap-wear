@@ -1,0 +1,20 @@
+# Reverse proxy for the whole site. With a real domain as SITE_ADDRESS, Caddy
+# obtains and renews the HTTPS certificate by itself.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# API
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	# Product photos from object storage: /media/<bucket>/<key>
+	handle_path /media/* {
+		reverse_proxy minio:9000
+	}
+
+	# Everything else is the website.
+	handle {
+		reverse_proxy web:3000
+	}
+}

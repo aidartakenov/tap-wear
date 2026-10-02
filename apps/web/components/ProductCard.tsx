@@ -1,8 +1,9 @@
 'use client';
 
+import { StoreAvatar } from '@/components/StoreAvatar';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart } from 'lucide-react';
+import { Bookmark } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatPrice } from '@/lib/catalog';
 import { Product } from '@/lib/types';
@@ -38,9 +39,9 @@ export function ProductCard({ product }: ProductCardProps) {
               }}
               className="absolute top-2 left-2 p-1.5 bg-white/80 rounded-full hover:bg-white transition-colors"
             >
-              <Heart
+              <Bookmark
                 className={`w-4 h-4 ${
-                  favorite ? 'fill-red-500 text-red-500' : 'text-gray-600'
+                  favorite ? 'fill-blue-600 text-blue-600' : 'text-gray-600'
                 }`}
               />
             </button>
@@ -54,7 +55,14 @@ export function ProductCard({ product }: ProductCardProps) {
             <h3 className="font-medium text-sm text-gray-900 mb-1 line-clamp-2">
               {product.title}
             </h3>
-            <p className="text-xs text-gray-500 mb-1 truncate">{product.store.name}</p>
+            <p className="mb-1 flex items-center gap-1.5 text-xs text-gray-500">
+              <StoreAvatar
+                name={product.store.name}
+                url={product.store.avatar_url}
+                className="h-5 w-5 text-[9px]"
+              />
+              <span className="truncate">{product.store.name}</span>
+            </p>
             {product.sizes.length > 0 && (
               <p className="text-xs text-gray-600 mb-2 truncate">
                 {t('product.sizesList', { sizes: product.sizes.join(', ') })}
