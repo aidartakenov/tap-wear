@@ -13,7 +13,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const { isFavorite, toggleFavorite } = useApp();
+  const { isFavorite, toggleFavorite, t, locale } = useApp();
   const favorite = isFavorite(product.id);
 
   return (
@@ -31,7 +31,7 @@ export function ProductCard({ product }: ProductCardProps) {
               />
             )}
             <button
-              aria-label={favorite ? 'Убрать из избранного' : 'Добавить в избранное'}
+              aria-label={t(favorite ? 'favorite.remove' : 'favorite.add')}
               onClick={(e) => {
                 e.preventDefault();
                 toggleFavorite(product.id);
@@ -46,7 +46,7 @@ export function ProductCard({ product }: ProductCardProps) {
             </button>
             {product.availability === 'out_of_stock' && (
               <span className="absolute bottom-2 left-2 rounded-full bg-gray-900/80 px-2 py-0.5 text-xs font-medium text-white">
-                Нет в наличии
+                {t('availability.out_of_stock')}
               </span>
             )}
           </div>
@@ -57,11 +57,11 @@ export function ProductCard({ product }: ProductCardProps) {
             <p className="text-xs text-gray-500 mb-1 truncate">{product.store.name}</p>
             {product.sizes.length > 0 && (
               <p className="text-xs text-gray-600 mb-2 truncate">
-                Размеры: {product.sizes.join(', ')}
+                {t('product.sizesList', { sizes: product.sizes.join(', ') })}
               </p>
             )}
             <p className="font-bold text-sm text-gray-900">
-              {formatPrice(product.price_minor, product.price_varies)}
+              {formatPrice(product.price_minor, product.price_varies, locale)}
             </p>
           </div>
         </CardContent>

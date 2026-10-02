@@ -12,7 +12,8 @@ import { ErrorState, Loading } from '@/components/PageState';
 import { ReportProblem } from '@/components/ReportProblem';
 import { track } from '@/lib/analytics';
 import { getProduct } from '@/lib/api';
-import { audienceLabels, availabilityLabels, formatPrice, sizeSystemLabel } from '@/lib/catalog';
+import { formatPrice } from '@/lib/catalog';
+import { Locale, optionalKey } from '@/lib/i18n';
 import { useApp } from '@/lib/context';
 import { ProductDetail, Variant } from '@/lib/types';
 import { useApi } from '@/lib/useApi';
@@ -27,8 +28,8 @@ const availabilityColor = {
   unknown: 'text-gray-600',
 };
 
-function formatConfirmed(value: string): string {
-  return new Date(value).toLocaleDateString('ru-RU', {
+function formatConfirmed(value: string, locale: Locale): string {
+  return new Date(value).toLocaleDateString(locale === 'ky' ? 'ky-KG' : 'ru-RU', {
     day: 'numeric',
     month: 'long',
     timeZone: 'Asia/Bishkek',
@@ -43,7 +44,9 @@ function ProductView({ product }: { product: ProductDetail }) {
     product.variants.length === 1 ? product.variants[0].id : null
   );
   const selected: Variant | undefined = product.variants.find((v) => v.id === selectedId);
-  const sizeSystem = sizeSystemLabel(product.size_system);
+  const { t, locale } = useApp();
+  const systemKey = optionalKey(`sizeSystem.${product.size_system}`);
+  const sizeSystem = systemKey ? t(systemKey) : product.size_system;
 
   // One view per opened product page, for the store's statistics.
   useEffect(() => {
@@ -59,7 +62,7 @@ function ProductView({ product }: { product: ProductDetail }) {
             <div key={image} className="relative aspect-[3/4] w-full shrink-0 snap-center">
               <Image
                 src={image}
-                alt={`${product.title}, фото ${index + 1}`}
+                alt={t('product.photoAlt', { title: product.title, n: index + 1 })}
                 fill
                 sizes="(max-width: 768px) 100vw, 448px"
                 className="object-contain"
@@ -70,7 +73,7 @@ function ProductView({ product }: { product: ProductDetail }) {
         </div>
         {product.images.length > 1 && (
           <p className="text-center text-xs text-gray-500 py-1">
-            Фото: {product.images.length}. Листайте в сторону
+            {t('product.photos', { n: product.images.length })}
           </p>
         )}
       </div>
@@ -80,7 +83,7 @@ function ProductView({ product }: { product: ProductDetail }) {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">{product.title}</h1>
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <Badge variant="secondary">{product.category.name}</Badge>
-            <Badge variant="outline">{audienceLabels[product.audience]}</Badge>
+            <Badge variant="outline">{t(`audience.${product.audience}`)}</Badge>
             {product.colors.map((color) => (
               <Badge key={color.code} variant="outline">
                 {color.name}
@@ -90,22 +93,24 @@ function ProductView({ product }: { product: ProductDetail }) {
           <p className="text-2xl font-bold text-gray-900">
             {selected
               ? formatPrice(selected.price_minor)
-              : formatPrice(product.price_minor, product.price_varies)}
+              : formatPrice(product.price_minor, product.price_varies, locale)}
           </p>
           <p className={`text-sm mt-1 ${availabilityColor[availability]}`}>
-            {availabilityLabels[availability]}
+            {t(`availability.${availability}`)}
             {selected?.availability_confirmed_at &&
-              ` · подтверждено ${formatConfirmed(selected.availability_confirmed_at)}`}
+              ` · ${t('product.confirmed', {
+                date: formatConfirmed(selected.availability_confirmed_at, locale),
+              })}`}
           </p>
         </div>
 
         <Separator />
 
         <div>
-          <h2 className="font-semibold text-gray-900 mb-2">Размеры</h2>
+          <h2 className="font-semibold text-gray-900 mb-2">{t('product.sizes')}</h2>
           {sized.length > 0 ? (
             <>
-              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Размер">
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('product.sizeLabel')}>
                 {sized.map((variant) => {
                   const soldOut = variant.availability === 'out_of_stock';
                   const active = variant.id === selectedId;
@@ -130,21 +135,23 @@ function ProductView({ product }: { product: ProductDetail }) {
                 })}
               </div>
               {sizeSystem && (
-                <p className="text-xs text-gray-500 mt-2">Система размеров: {sizeSystem}</p>
+                <p className="text-xs text-gray-500 mt-2">
+                  {t('product.sizeSystem', { system: sizeSystem })}
+                </p>
               )}
               {!selected && (
                 <p className="text-xs text-gray-500 mt-1">
-                  Выберите размер, чтобы указать его в сообщении продавцу.
+                  {t('product.chooseSize')}
                 </p>
               )}
             </>
           ) : (
-            <p className="text-sm text-gray-600">Магазин не указал размеры. Уточните у продавца.</p>
+            <p className="text-sm text-gray-600">{t('product.noSizes')}</p>
           )}
           <p className="text-xs text-gray-500 mt-2">
-            Замеры изделия продавец не указал.{' '}
+            {t('product.noMeasurements')}{' '}
             <Link href="/size-guide" className="text-blue-600 hover:underline">
-              Как выбрать размер
+              {t('product.sizeGuide')}
             </Link>
           </p>
         </div>
@@ -153,7 +160,7 @@ function ProductView({ product }: { product: ProductDetail }) {
           <>
             <Separator />
             <div>
-              <h2 className="font-semibold text-gray-900 mb-2">Описание</h2>
+              <h2 className="font-semibold text-gray-900 mb-2">{t('product.description')}</h2>
               <p className="text-sm text-gray-600 whitespace-pre-line">{product.description}</p>
             </div>
           </>
@@ -165,7 +172,7 @@ function ProductView({ product }: { product: ProductDetail }) {
           <Card className="hover:shadow-md transition-shadow">
             <CardContent className="p-4 flex items-center justify-between gap-2">
               <div>
-                <h2 className="text-xs text-gray-500 mb-1">Продавец</h2>
+                <h2 className="text-xs text-gray-500 mb-1">{t('product.seller')}</h2>
                 <p className="font-medium text-gray-900">{store.name}</p>
                 <p className="text-sm text-gray-600">
                   {[store.city.name, store.address].filter(Boolean).join(', ')}
@@ -200,7 +207,7 @@ function ProductView({ product }: { product: ProductDetail }) {
 export default function ProductDetailPage() {
   const id = String(useParams().id);
   const router = useRouter();
-  const { isFavorite, toggleFavorite } = useApp();
+  const { isFavorite, toggleFavorite, t } = useApp();
   const { data: product, error, loading } = useApi((signal) => getProduct(id, signal), [id]);
   const favorite = isFavorite(id);
 
@@ -208,14 +215,14 @@ export default function ProductDetailPage() {
     <div className="min-h-screen pb-24 md:pb-12">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-          <Button variant="ghost" size="icon" aria-label="Назад" onClick={() => router.back()}>
+          <Button variant="ghost" size="icon" aria-label={t('common.back')} onClick={() => router.back()}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           {product && (
             <Button
               variant="ghost"
               size="icon"
-              aria-label={favorite ? 'Убрать из избранного' : 'Добавить в избранное'}
+              aria-label={t(favorite ? 'favorite.remove' : 'favorite.add')}
               onClick={() => toggleFavorite(id)}
             >
               <Heart
@@ -227,7 +234,7 @@ export default function ProductDetailPage() {
       </header>
 
       {error ? (
-        <ErrorState error={error} notFound="Товар не найден или снят с продажи" />
+        <ErrorState error={error} notFound={t('product.notFound')} />
       ) : loading || !product ? (
         <Loading />
       ) : (

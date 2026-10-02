@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Upload, X, Search } from 'lucide-react';
+import { useApp } from '@/lib/context';
 
 interface VisualSearchModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export function VisualSearchModal({
   onClose,
   onSearch,
 }: VisualSearchModalProps) {
+  const { t } = useApp();
   const [imageSrc, setImageSrc] = useState<string>('');
   const [crop, setCrop] = useState<Crop>();
   const [isUploading, setIsUploading] = useState(false);
@@ -60,7 +62,7 @@ export function VisualSearchModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md w-full">
         <DialogHeader>
-          <DialogTitle>Поиск по фото</DialogTitle>
+          <DialogTitle>{t('photo.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -80,10 +82,10 @@ export function VisualSearchModal({
               >
                 <Upload className="w-12 h-12 text-gray-400 mb-3" />
                 <p className="text-sm text-gray-600 mb-2">
-                  Нажмите для загрузки фото
+                  {t('photo.click')}
                 </p>
                 <p className="text-xs text-gray-500">
-                  JPEG или PNG, до 10MB
+                  {t('photo.formats')}
                 </p>
               </label>
             </div>
@@ -111,7 +113,7 @@ export function VisualSearchModal({
               </div>
 
               <p className="text-sm text-gray-600 text-center">
-                Выделите область с одеждой для поиска
+                {t('photo.crop')}
               </p>
 
               <Button
@@ -120,7 +122,7 @@ export function VisualSearchModal({
                 disabled={!crop}
               >
                 <Search className="w-4 h-4 mr-2" />
-                Найти похожие
+                {t('photo.find')}
               </Button>
             </div>
           )}
@@ -128,7 +130,7 @@ export function VisualSearchModal({
           {isUploading && (
             <div className="text-center py-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-sm text-gray-600 mt-2">Загрузка...</p>
+              <p className="text-sm text-gray-600 mt-2">{t('photo.loading')}</p>
             </div>
           )}
         </div>

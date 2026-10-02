@@ -137,3 +137,18 @@ def test_catalog_filters_describe_only_visible_products(client):
     assert [c["code"] for c in filters["categories"]] == ["jackets", "hoodies"]
     assert filters["price_max_minor"] == 5000 * SOM
     assert [store["slug"] for store in filters["stores"]] == ["open"]
+
+
+def test_reference_names_follow_the_requested_language_with_russian_fallback(client):
+    kyrgyz = {"Accept-Language": "ky-KG,ky;q=0.9,ru;q=0.8"}
+
+    filters = client.get("/api/v1/catalog/filters", headers=kyrgyz).json()
+    names = {category["code"]: category["name"] for category in filters["categories"]}
+    jacket = client.get(f"{PRODUCTS}/{IDS['jacket']}", headers=kyrgyz).json()
+    default = client.get(f"{PRODUCTS}/{IDS['jacket']}").json()
+
+    # "hoodies" has no Kyrgyz name in the fixtures, so it stays Russian.
+    assert names == {"jackets": "Курткалар", "hoodies": "Худи"}
+    assert jacket["category"]["name"] == "Курткалар"
+    assert default["category"]["name"] == "Куртки"
+    assert titles(client.get(PRODUCTS, params={"q": "курткалар"})) == {"jacket", "parka"}

@@ -8,7 +8,7 @@ import { useApp } from '@/lib/context';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, signUp } = useApp();
+  const { signIn, signUp, t } = useApp();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,21 +49,20 @@ export default function LoginPage() {
     <div className="min-h-screen pb-24 md:pb-12">
       <main className="mx-auto max-w-md px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900">
-          {mode === 'login' ? 'Вход в TapWear' : 'Новый аккаунт'}
+          {t(mode === 'login' ? 'login.title' : 'login.newAccount')}
         </h1>
         <p className="mt-1 text-sm text-gray-600">
-          С аккаунтом избранное доступно на всех ваших устройствах. Владельцы магазинов из
-          аккаунта управляют своими товарами. Искать и смотреть каталог можно и без входа.
+          {t('login.intro')}
         </p>
 
         <div className="mt-6 flex gap-1 rounded-lg bg-gray-100 p-1">
-          {tab('login', 'Вход')}
-          {tab('register', 'Регистрация')}
+          {tab('login', t('login.tabSignIn'))}
+          {tab('register', t('login.tabRegister'))}
         </div>
 
         <form onSubmit={submit} className="mt-4 space-y-4 rounded-xl border border-gray-200 bg-white p-4">
           {mode === 'register' && (
-            <Field label="Имя">
+            <Field label={t('login.name')}>
               <input
                 className={inputClass}
                 value={name}
@@ -74,7 +73,7 @@ export default function LoginPage() {
               />
             </Field>
           )}
-          <Field label="Электронная почта">
+          <Field label={t('login.email')}>
             <input
               className={inputClass}
               type="email"
@@ -84,7 +83,10 @@ export default function LoginPage() {
               required
             />
           </Field>
-          <Field label="Пароль" hint={mode === 'register' ? 'Не короче 8 символов' : undefined}>
+          <Field
+            label={t('login.password')}
+            hint={mode === 'register' ? t('login.passwordHint') : undefined}
+          >
             <input
               className={inputClass}
               type="password"
@@ -97,7 +99,7 @@ export default function LoginPage() {
           </Field>
           <FormError error={error} />
           <button type="submit" disabled={busy} className={`${primaryButton} w-full`}>
-            {busy ? 'Подождите…' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+            {t(busy ? 'login.wait' : mode === 'login' ? 'nav.signIn' : 'login.create')}
           </button>
         </form>
       </main>

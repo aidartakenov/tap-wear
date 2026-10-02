@@ -92,6 +92,11 @@ Sessions use an HttpOnly cookie; every changing request must also carry the sess
 - **Events:** the web app reports product views, storefront views and contact clicks to `POST /events`. No personal data is stored: the visitor is a random id from the browser, and no IP address or search text is kept. A link can carry `?source=instagram` (or `utm_source`) so the store can see where visitors came from.
 - **Statistics:** each store's members see views, visitors, contact clicks, sources and top products for 7 or 30 days in the cabinet. A contact click is an inquiry, not a sale.
 
+## Languages and request limits
+
+- **Languages:** the buyer-facing pages are in Russian and Kyrgyz; the switch is in the header and the choice is kept in a cookie. Interface text lives in `apps/web/lib/i18n` (`ru.ts` is the source, `ky.ts` must have the same keys). The API returns category, colour and city names in the language of the `Accept-Language` header, falling back to Russian. The Kyrgyz text was machine-drafted and needs review by a native speaker before a public release. The seller cabinet and moderation pages are Russian only for now.
+- **Request limits:** sign-in, registration, reports, events and photo uploads are limited per client address (`RATE_LIMIT_ENABLED`). Counters are kept in the API process's memory, which is enough for a single process.
+
 ## Checks
 
 From `apps/api` (the tests use a separate `tapwear_test` database and a separate `tapwear-test-assets` bucket; the ones that need Postgres or object storage are skipped if it is not running):

@@ -60,7 +60,15 @@ def install_error_handling(app: FastAPI) -> None:
 
     @app.exception_handler(ApiError)
     async def handle_api_error(request: Request, error: ApiError):
-        return error_response(request, error.status_code, error.code, error.message, error.details)
+        response = error_response(
+            request, error.status_code, error.code, error.message, error.details
+        )
+        # Tell a limited client when it may try again.
+        if error.status_code == 429 and isinstance(error.details, dict):
+            retry_after = error.details.get("retry_after_seconds")
+            if retry_after:
+                response.headers["Retry-After"] = str(retry_after)
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(request: Request, error: RequestValidationError):

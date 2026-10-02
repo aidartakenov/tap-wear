@@ -34,6 +34,35 @@ NAMESPACE = uuid.UUID("6f1c2f0e-6a3b-4c58-9f0d-7d1e5b0a9c11")
 
 CITIES = {"Бишкек": "bishkek"}
 
+# Kyrgyz display names. Machine-drafted: they need review by a native speaker
+# before a public release.
+CITY_NAMES_KY = {"bishkek": "Бишкек"}
+CATEGORY_NAMES_KY = {
+    "jackets": "Курткалар",
+    "coats": "Пальто жана тренчтер",
+    "suits": "Костюмдар",
+    "hoodies": "Худи жана свитшоттор",
+    "knitwear": "Свитерлер жана кардигандар",
+    "blazers": "Пиджактар жана жакеттер",
+    "shirts": "Рубашкалар жана блузкалар",
+    "dresses": "Көйнөктөр жана юбкалар",
+    "shorts": "Шортылар",
+    "trousers": "Шымдар жана джинсылар",
+    "tshirts": "Футболкалар жана поло",
+}
+COLOR_NAMES_KY = {
+    "black": "Кара",
+    "white": "Ак",
+    "blue": "Көк",
+    "green": "Жашыл",
+    "brown": "Күрөң",
+    "orange": "Кызгылт сары",
+    "pink": "Кызгылт",
+    "burgundy": "Кочкул кызыл",
+    "red": "Кызыл",
+    "beige": "Беж",
+}
+
 COLORS = {
     "Черный": "black",
     "Белый": "white",
@@ -58,12 +87,19 @@ async def seed(path: Path) -> None:
 
     async with SessionLocal() as session:
         for name, code in CITIES.items():
-            await session.merge(City(code=code, name_ru=name))
+            await session.merge(City(code=code, name_ru=name, name_ky=CITY_NAMES_KY.get(code)))
         for name, code in COLORS.items():
-            await session.merge(Color(code=code, name_ru=name))
+            await session.merge(Color(code=code, name_ru=name, name_ky=COLOR_NAMES_KY.get(code)))
         categories = {p["category"]: p["categoryLabel"] for p in catalog["products"]}
         for position, (code, label) in enumerate(sorted(categories.items(), key=lambda c: c[1])):
-            await session.merge(Category(code=code, name_ru=label, position=position))
+            await session.merge(
+                Category(
+                    code=code,
+                    name_ru=label,
+                    name_ky=CATEGORY_NAMES_KY.get(code),
+                    position=position,
+                )
+            )
         await session.flush()
 
         store_ids = {}

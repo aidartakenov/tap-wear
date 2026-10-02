@@ -17,21 +17,21 @@ export function RequireAccount({
   admin?: boolean;
   children: (me: Me) => ReactNode;
 }) {
-  const { me } = useApp();
+  const { me, t } = useApp();
 
   if (me === undefined) return <Loading />;
   if (me === null) {
     return (
       <div className="py-16 text-center">
-        <p className="font-medium text-gray-900">Войдите, чтобы продолжить</p>
+        <p className="font-medium text-gray-900">{t('account.signInToContinue')}</p>
         <Link href="/login" className={`${primaryButton} mt-4`}>
-          Войти или зарегистрироваться
+          {t('profile.signInOrRegister')}
         </Link>
       </div>
     );
   }
   if (admin && !me.is_admin) {
-    return <p className="py-16 text-center text-gray-600">Раздел доступен только администратору.</p>;
+    return <p className="py-16 text-center text-gray-600">{t('account.adminOnly')}</p>;
   }
   return <>{children(me)}</>;
 }

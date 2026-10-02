@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.catalog.models import Product, ProductImage, ProductStatus
 from app.database import get_session
 from app.errors import not_found
+from app.locale import display_name, name_column
 from app.reference.models import Category
 from app.storage import image_url
 from app.stores.models import Store, StoreStatus
@@ -20,11 +21,11 @@ async def to_store_out(session: AsyncSession, store: Store) -> StoreOut:
 
     product_count = await session.scalar(select(func.count()).select_from(Product).where(published))
     categories = await session.scalars(
-        select(Category.name_ru)
+        select(name_column(Category))
         .join(Product, Product.category_code == Category.code)
         .where(published)
         .group_by(Category.code)
-        .order_by(func.count().desc(), Category.name_ru)
+        .order_by(func.count().desc(), name_column(Category))
     )
     preview_images = await session.execute(
         select(ProductImage.object_key, ProductImage.external_url)
@@ -39,7 +40,7 @@ async def to_store_out(session: AsyncSession, store: Store) -> StoreOut:
         slug=store.slug,
         name=store.name,
         description=store.description,
-        city=CityOut(code=store.city.code, name=store.city.name_ru),
+        city=CityOut(code=store.city.code, name=display_name(store.city)),
         address=store.address,
         market=store.market,
         sector=store.sector,

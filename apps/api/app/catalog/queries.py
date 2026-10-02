@@ -83,6 +83,7 @@ def matching_variants(filters: ProductFilter) -> Select:
                 Product.brand.ilike(pattern),
                 Store.name.ilike(pattern),
                 Category.name_ru.ilike(pattern),
+                Category.name_ky.ilike(pattern),
             )
         )
 

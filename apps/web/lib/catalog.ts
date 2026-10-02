@@ -43,12 +43,14 @@ export const defaultFilter: FilterState = {
   sort: 'default',
 };
 
-export function formatPrice(priceMinor: number, priceVaries = false): string {
+export function formatPrice(priceMinor: number, priceVaries = false, locale = 'ru'): string {
   const soms = Math.floor(priceMinor / 100);
   const tyiyn = priceMinor % 100;
   const whole = soms.toLocaleString('ru-RU');
   const amount = tyiyn ? `${whole},${String(tyiyn).padStart(2, '0')} сом` : `${whole} сом`;
-  return priceVaries ? `от ${amount}` : amount;
+  if (!priceVaries) return amount;
+  // "from 4 500 soms": the lowest price among variants that cost differently.
+  return locale === 'ky' ? `${amount}дон` : `от ${amount}`;
 }
 
 // Russian plural: plural(21, ['товар', 'товара', 'товаров']) -> "21 товар".

@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import health
@@ -12,6 +12,7 @@ from app.catalog.router import router as catalog_router
 from app.config import get_settings
 from app.database import engine
 from app.errors import REQUEST_ID_HEADER, install_error_handling
+from app.locale import use_request_locale
 from app.merchant.router import router as merchant_router
 from app.moderation.router import admin_router, reports_router
 from app.reference.router import router as reference_router
@@ -30,6 +31,7 @@ app = FastAPI(
     title=settings.app_name,
     debug=settings.debug,
     lifespan=lifespan,
+    dependencies=[Depends(use_request_locale)],
     openapi_url=f"{settings.api_v1_prefix}/openapi.json",
     docs_url=f"{settings.api_v1_prefix}/docs",
     redoc_url=None,

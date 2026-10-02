@@ -8,7 +8,8 @@ import { FilterBar } from '@/components/FilterBar';
 import { ErrorState, ProductGridSkeleton } from '@/components/PageState';
 import { ProductCard } from '@/components/ProductCard';
 import { ApiError, getProducts } from '@/lib/api';
-import { ALL, audienceLabels, filterToQuery, plural, productForms } from '@/lib/catalog';
+import { ALL, filterToQuery } from '@/lib/catalog';
+import { Translate } from '@/lib/i18n';
 import { useApp } from '@/lib/context';
 import { Audience, CatalogFilters, FilterState, Product } from '@/lib/types';
 import { useCatalogFilter } from '@/lib/useCatalogFilter';
@@ -19,14 +20,19 @@ interface Chip {
 }
 
 // Removable chips for what is currently applied; each one clears a single filter.
-function appliedChips(filter: FilterState, catalog: CatalogFilters | null): Chip[] {
+function appliedChips(
+  filter: FilterState,
+  catalog: CatalogFilters | null,
+  t: Translate
+): Chip[] {
   const chips: Chip[] = [];
   const name = <T extends { name: string }>(items: T[] | undefined, match: (item: T) => boolean) =>
     items?.find(match)?.name;
 
   if (filter.query) chips.push({ label: `«${filter.query}»`, clear: { query: '' } });
   if (filter.audience !== ALL) {
-    const label = audienceLabels[filter.audience as Audience] ?? filter.audience;
+    const known = catalog?.audiences.some((audience) => audience.code === filter.audience);
+    const label = known ? t(`audience.${filter.audience as Audience}`) : filter.audience;
     chips.push({ label, clear: { audience: ALL } });
   }
   if (filter.category !== ALL) {
@@ -41,30 +47,33 @@ function appliedChips(filter: FilterState, catalog: CatalogFilters | null): Chip
     const label = name(catalog?.colors, (c) => c.code === filter.color);
     chips.push({ label: label ?? filter.color, clear: { color: ALL } });
   }
-  if (filter.size) chips.push({ label: `Размер ${filter.size}`, clear: { size: '' } });
+  if (filter.size) chips.push({ label: t('catalog.chipSize', { size: filter.size }), clear: { size: '' } });
   if (filter.minPrice > 0 || filter.maxPrice != null) {
     const from = filter.minPrice.toLocaleString('ru-RU');
     const label =
       filter.maxPrice == null
-        ? `от ${from} сом`
-        : `${from}–${filter.maxPrice.toLocaleString('ru-RU')} сом`;
+        ? t('catalog.chipPriceFrom', { min: from })
+        : t('catalog.chipPriceRange', {
+            min: from,
+            max: filter.maxPrice.toLocaleString('ru-RU'),
+          });
     chips.push({ label, clear: { minPrice: 0, maxPrice: null } });
   }
-  if (filter.inStock) chips.push({ label: 'В наличии', clear: { inStock: false } });
+  if (filter.inStock) chips.push({ label: t('catalog.chipInStock'), clear: { inStock: false } });
   return chips;
 }
 
-function pageTitle(filter: FilterState, chips: Chip[]): string {
-  if (filter.query) return `Поиск: ${filter.query}`;
+function pageTitle(filter: FilterState, chips: Chip[], t: Translate): string {
+  if (filter.query) return t('catalog.search', { query: filter.query });
   const category = filter.category !== ALL ? chips.find((c) => 'category' in c.clear) : undefined;
   const audience = filter.audience !== ALL ? chips.find((c) => 'audience' in c.clear) : undefined;
   if (category && audience) return `${category.label} · ${audience.label.toLowerCase()}`;
-  return category?.label ?? audience?.label ?? 'Каталог';
+  return category?.label ?? audience?.label ?? t('catalog.title');
 }
 
 function Catalog() {
   const { filter, setFilter } = useCatalogFilter();
-  const { catalog } = useApp();
+  const { catalog, t, count } = useApp();
   const [products, setProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -117,15 +126,15 @@ function Catalog() {
     }
   };
 
-  const chips = appliedChips(filter, catalog);
+  const chips = appliedChips(filter, catalog, t);
 
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-baseline justify-between gap-3">
-          <h1 className="text-xl font-bold text-gray-900 truncate">{pageTitle(filter, chips)}</h1>
+          <h1 className="text-xl font-bold text-gray-900 truncate">{pageTitle(filter, chips, t)}</h1>
           {total !== null && !error && (
-            <p className="text-sm text-gray-500 shrink-0">{plural(total, productForms)}</p>
+            <p className="text-sm text-gray-500 shrink-0">{count(total, 'product')}</p>
           )}
         </div>
         <FilterBar />
@@ -141,7 +150,7 @@ function Catalog() {
                 className="flex items-center gap-1 rounded-full bg-gray-900 pl-3 pr-2 py-1 text-xs font-medium text-white hover:bg-gray-700"
               >
                 {chip.label}
-                <X className="w-3.5 h-3.5" aria-label="Убрать фильтр" />
+                <X className="w-3.5 h-3.5" aria-label={t('catalog.removeFilter')} />
               </button>
             ))}
           </div>
@@ -149,12 +158,12 @@ function Catalog() {
 
         {filter.store !== ALL && (
           <p className="text-sm text-gray-600">
-            Показаны товары одного магазина.{' '}
+            {t('catalog.oneStore')}{' '}
             <button
               onClick={() => setFilter({ store: ALL })}
               className="font-medium text-blue-600 hover:underline"
             >
-              Искать во всех магазинах
+              {t('catalog.searchAll')}
             </button>
           </p>
         )}
@@ -177,11 +186,9 @@ function Catalog() {
 
             {products.length === 0 && (
               <div className="text-center py-16">
-                <p className="font-medium text-gray-900">Ничего не найдено</p>
+                <p className="font-medium text-gray-900">{t('catalog.nothing')}</p>
                 <p className="mt-1 text-sm text-gray-500">
-                  {chips.length > 0
-                    ? 'Уберите один из фильтров выше, чтобы увидеть больше товаров.'
-                    : 'В каталоге пока нет товаров.'}
+                  {t(chips.length > 0 ? 'catalog.removeOne' : 'catalog.empty')}
                 </p>
               </div>
             )}
@@ -193,7 +200,9 @@ function Catalog() {
                   disabled={loadingMore}
                   className="rounded-full border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60"
                 >
-                  {loadingMore ? 'Загружаем…' : `Показать ещё (${products.length} из ${total})`}
+                  {loadingMore
+                    ? t('state.loading')
+                    : t('catalog.more', { shown: products.length, total: total ?? 0 })}
                 </button>
               </div>
             )}

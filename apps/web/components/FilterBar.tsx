@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { ALL, audienceLabels, sliderMaxSom, sortLabels } from '@/lib/catalog';
+import { ALL, sliderMaxSom, sortLabels } from '@/lib/catalog';
 import { useApp } from '@/lib/context';
 import { SortOrder } from '@/lib/types';
 import { useCatalogFilter } from '@/lib/useCatalogFilter';
@@ -19,11 +19,6 @@ interface Option {
   value: string;
   label: string;
 }
-
-const sortItems: Option[] = (Object.keys(sortLabels) as SortOrder[]).map((sort) => ({
-  value: sort,
-  label: sortLabels[sort],
-}));
 
 function FilterSelect({
   label,
@@ -57,28 +52,32 @@ function FilterSelect({
 
 export function FilterBar() {
   const { filter, setFilter, resetFilter, activeCount } = useCatalogFilter();
-  const { catalog } = useApp();
+  const { catalog, t } = useApp();
+  const sortItems: Option[] = (Object.keys(sortLabels) as SortOrder[]).map((sort) => ({
+    value: sort,
+    label: t(`sort.${sort}`),
+  }));
 
   // The choices come from what the catalog actually contains.
   const audienceItems: Option[] = [
-    { value: ALL, label: 'Для всех' },
-    ...(catalog?.audiences ?? []).map(({ code }) => ({ value: code, label: audienceLabels[code] })),
+    { value: ALL, label: t('audience.all') },
+    ...(catalog?.audiences ?? []).map(({ code }) => ({ value: code, label: t(`audience.${code}`) })),
   ];
   const categoryItems: Option[] = [
-    { value: ALL, label: 'Все категории' },
+    { value: ALL, label: t('filter.allCategories') },
     ...(catalog?.categories ?? []).map(({ code, name }) => ({ value: code, label: name })),
   ];
   const storeItems: Option[] = [
-    { value: ALL, label: 'Все магазины' },
+    { value: ALL, label: t('filter.allStores') },
     ...(catalog?.stores ?? []).map(({ slug, name }) => ({ value: slug, label: name })),
   ];
   const colorItems: Option[] = [
-    { value: ALL, label: 'Любой цвет' },
+    { value: ALL, label: t('filter.anyColor') },
     ...(catalog?.colors ?? []).map(({ code, name }) => ({ value: code, label: name })),
   ];
   const sizeLabels = Array.from(new Set((catalog?.sizes ?? []).map((size) => size.label)));
   const sizeItems: Option[] = [
-    { value: ALL, label: 'Все размеры' },
+    { value: ALL, label: t('filter.allSizes') },
     ...sizeLabels.map((label) => ({ value: label, label })),
   ];
   const maxPriceSom = sliderMaxSom(catalog?.price_max_minor ?? 0);
@@ -98,7 +97,7 @@ export function FilterBar() {
           className="flex items-center gap-2 rounded-full border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-900 hover:bg-gray-50"
         >
           <SlidersHorizontal className="w-4 h-4" />
-          Фильтры
+          {t('filter.title')}
           {activeCount > 0 && (
             <span className="rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">
               {activeCount}
@@ -111,11 +110,11 @@ export function FilterBar() {
         {activeCount > 0 && (
           <button
             onClick={resetFilter}
-            aria-label="Сбросить фильтры"
+            aria-label={t('filter.resetAll')}
             className="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
           >
             <X className="w-4 h-4" />
-            <span className="hidden sm:inline">Сбросить</span>
+            <span className="hidden sm:inline">{t('filter.reset')}</span>
           </button>
         )}
         <div className="ml-auto min-w-0 flex-1 max-w-44">
@@ -124,7 +123,7 @@ export function FilterBar() {
             value={filter.sort}
             onValueChange={(sort) => setFilter({ sort: (sort ?? 'default') as SortOrder })}
           >
-            <SelectTrigger className="w-full" aria-label="Сортировка">
+            <SelectTrigger className="w-full" aria-label={t('filter.sort')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -142,39 +141,41 @@ export function FilterBar() {
         <div className="bg-gray-50 border-t border-gray-200">
           <div className="mx-auto max-w-6xl px-4 py-3 grid grid-cols-2 md:grid-cols-4 gap-3">
             <FilterSelect
-              label="Для кого"
+              label={t('filter.audience')}
               items={audienceItems}
               value={filter.audience}
               onChange={(audience) => setFilter({ audience })}
             />
             <FilterSelect
-              label="Категория"
+              label={t('filter.category')}
               items={categoryItems}
               value={filter.category}
               onChange={(category) => setFilter({ category })}
             />
             <FilterSelect
-              label="Магазин"
+              label={t('filter.store')}
               items={storeItems}
               value={filter.store}
               onChange={(store) => setFilter({ store })}
             />
             <FilterSelect
-              label="Цвет"
+              label={t('filter.color')}
               items={colorItems}
               value={filter.color}
               onChange={(color) => setFilter({ color })}
             />
             <FilterSelect
-              label="Размер"
+              label={t('filter.size')}
               items={sizeItems}
               value={filter.size || ALL}
               onChange={(size) => setFilter({ size: size === ALL ? '' : size })}
             />
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600 mb-1 block">
-                Цена: {priceRange[0].toLocaleString('ru-RU')} –{' '}
-                {priceRange[1].toLocaleString('ru-RU')} сом
+                {t('filter.price', {
+                  min: priceRange[0].toLocaleString('ru-RU'),
+                  max: priceRange[1].toLocaleString('ru-RU'),
+                })}
               </label>
               <div className="h-8 flex items-center px-2">
                 <Slider
@@ -205,7 +206,7 @@ export function FilterBar() {
                 onChange={(event) => setFilter({ inStock: event.target.checked })}
                 className="h-4 w-4 rounded border-gray-300"
               />
-              Только с подтверждённым наличием
+              {t('filter.inStockOnly')}
             </label>
           </div>
         </div>

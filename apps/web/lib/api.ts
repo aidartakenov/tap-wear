@@ -61,7 +61,7 @@ async function parse<T>(response: Response): Promise<T> {
 
 // POST, PATCH and DELETE. A FormData body is sent as a file upload, anything else as JSON.
 async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { 'Accept-Language': clientLocale };
   if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
   const isUpload = body instanceof FormData;
   if (body !== undefined && !isUpload) headers['Content-Type'] = 'application/json';
@@ -79,7 +79,20 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
   return parse<T>(response);
 }
 
-async function get<T>(path: string, params?: URLSearchParams, signal?: AbortSignal): Promise<T> {
+// The interface language. In the browser it is set once by the app provider; on
+// the server each call passes its own locale, because requests share this module.
+let clientLocale = 'ru';
+
+export function setApiLocale(locale: string) {
+  clientLocale = locale;
+}
+
+async function get<T>(
+  path: string,
+  params?: URLSearchParams,
+  signal?: AbortSignal,
+  locale?: string
+): Promise<T> {
   const query = params?.toString();
   let response: Response;
   try {
@@ -87,6 +100,8 @@ async function get<T>(path: string, params?: URLSearchParams, signal?: AbortSign
     response = await fetch(`${API_URL}${path}${query ? `?${query}` : ''}`, {
       signal,
       cache: 'no-store',
+      // Category, colour and city names come back in this language.
+      headers: { 'Accept-Language': locale ?? clientLocale },
       // Sends the session cookie, so signed-in areas work; harmless for guests.
       credentials: 'include',
     });
@@ -128,24 +143,24 @@ export function productParams({ filter = {}, ids, cursor, limit = PAGE_SIZE }: P
   return params;
 }
 
-export function getProducts(query: ProductQuery = {}, signal?: AbortSignal) {
-  return get<ProductPage>('/products', productParams(query), signal);
+export function getProducts(query: ProductQuery = {}, signal?: AbortSignal, locale?: string) {
+  return get<ProductPage>('/products', productParams(query), signal, locale);
 }
 
 export function getProduct(id: string, signal?: AbortSignal) {
   return get<ProductDetail>(`/products/${encodeURIComponent(id)}`, undefined, signal);
 }
 
-export function getStores(signal?: AbortSignal) {
-  return get<{ items: Store[] }>('/stores', undefined, signal);
+export function getStores(signal?: AbortSignal, locale?: string) {
+  return get<{ items: Store[] }>('/stores', undefined, signal, locale);
 }
 
 export function getStore(slug: string, signal?: AbortSignal) {
   return get<Store>(`/stores/${encodeURIComponent(slug)}`, undefined, signal);
 }
 
-export function getCatalogFilters(signal?: AbortSignal) {
-  return get<CatalogFilters>('/catalog/filters', undefined, signal);
+export function getCatalogFilters(signal?: AbortSignal, locale?: string) {
+  return get<CatalogFilters>('/catalog/filters', undefined, signal, locale);
 }
 
 // --- Accounts -----------------------------------------------------------------

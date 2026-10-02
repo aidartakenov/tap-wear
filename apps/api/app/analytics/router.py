@@ -15,6 +15,7 @@ from app.catalog.models import Availability, Product, ProductStatus, ProductVari
 from app.catalog.queries import visible_products
 from app.database import get_session
 from app.merchant.access import membership
+from app.rate_limit import rate_limit
 from app.stores.models import Store
 
 Db = Annotated[AsyncSession, Depends(get_session)]
@@ -49,7 +50,9 @@ class EventsOut(BaseModel):
     accepted: int
 
 
-@events_router.post("/events", status_code=202)
+@events_router.post(
+    "/events", status_code=202, dependencies=[Depends(rate_limit("events", limit=120))]
+)
 async def record_events(body: EventsIn, db: Db) -> EventsOut:
     """Record visitor events. Sending the same event_id again has no effect."""
     product_ids = {event.product_id for event in body.events if event.product_id}

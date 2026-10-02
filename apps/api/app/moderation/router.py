@@ -16,6 +16,7 @@ from app.catalog.queries import visible_products
 from app.database import get_session
 from app.errors import ApiError, not_found
 from app.moderation.models import ModerationLog, Report
+from app.rate_limit import rate_limit
 from app.stores.models import Store, StoreStatus
 
 Db = Annotated[AsyncSession, Depends(get_session)]
@@ -259,7 +260,9 @@ class ReportCreated(BaseModel):
     id: uuid.UUID = Field(description="Reference number of the report")
 
 
-@reports_router.post("/reports", status_code=201)
+@reports_router.post(
+    "/reports", status_code=201, dependencies=[Depends(rate_limit("reports", limit=5))]
+)
 async def create_report(body: ReportIn, db: Db) -> ReportCreated:
     """A buyer reports a problem with a product. No account is needed."""
     visible = await db.scalar(

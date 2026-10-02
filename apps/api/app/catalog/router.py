@@ -32,6 +32,7 @@ from app.catalog.schemas import (
 )
 from app.database import get_session
 from app.errors import not_found
+from app.locale import display_name, name_column
 from app.reference.models import Category, Color
 from app.stores.models import Store, StoreStatus
 from app.stores.router import to_store_out
@@ -61,7 +62,7 @@ def list_item_fields(product: Product, price_minor: int, price_varies: bool) -> 
         if effective_availability(variant) != Availability.OUT_OF_STOCK
     ]
     colors = {
-        variant.color.code: ColorOut(code=variant.color.code, name=variant.color.name_ru)
+        variant.color.code: ColorOut(code=variant.color.code, name=display_name(variant.color))
         for variant in product.variants
         if variant.color
     }
@@ -74,7 +75,7 @@ def list_item_fields(product: Product, price_minor: int, price_varies: bool) -> 
             is_demo=product.store.is_demo,
         ),
         "title": product.title,
-        "category": CategoryOut(code=product.category.code, name=product.category.name_ru),
+        "category": CategoryOut(code=product.category.code, name=display_name(product.category)),
         "audience": product.audience,
         "price_minor": price_minor,
         "price_varies": price_varies,
@@ -159,7 +160,7 @@ async def get_product_detail(
                 size_system=variant.size_system,
                 size_label=variant.size_label,
                 color=(
-                    ColorOut(code=variant.color.code, name=variant.color.name_ru)
+                    ColorOut(code=variant.color.code, name=display_name(variant.color))
                     if variant.color
                     else None
                 ),
@@ -206,7 +207,9 @@ async def get_catalog_filters(session: AsyncSession = Depends(get_session)) -> C
             .group_by(Product.category_code, Product.audience)
         )
     ).all()
-    category_names = dict((await session.execute(select(Category.code, Category.name_ru))).all())
+    category_names = dict(
+        (await session.execute(select(Category.code, name_column(Category)))).all()
+    )
 
     audience_totals: dict[str, int] = {}
     by_category: dict[str, list[CategoryAudienceCount]] = {}
@@ -229,12 +232,12 @@ async def get_catalog_filters(session: AsyncSession = Depends(get_session)) -> C
     categories.sort(key=lambda category: (-category.count, category.name))
 
     colors = await session.execute(
-        select(Color.code, Color.name_ru)
+        select(Color.code, name_column(Color))
         .join(ProductVariant, ProductVariant.color_code == Color.code)
         .join(Product, Product.id == ProductVariant.product_id)
         .where(in_catalog)
         .group_by(Color.code)
-        .order_by(Color.name_ru)
+        .order_by(name_column(Color))
     )
     sizes = await session.execute(
         select(ProductVariant.size_system, ProductVariant.size_label)

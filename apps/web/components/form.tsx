@@ -1,6 +1,10 @@
+'use client';
+
 import { ReactNode } from 'react';
 import { ApiError } from '@/lib/api';
 import { statusColors } from '@/lib/catalog';
+import { useApp } from '@/lib/context';
+import { Translate, optionalKey } from '@/lib/i18n';
 
 export const inputClass =
   'w-full h-10 rounded-lg border border-gray-300 bg-white px-3 text-base md:text-sm text-gray-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 disabled:bg-gray-100';
@@ -64,9 +68,14 @@ const problems: Record<string, string> = {
   'Add at least one photo': 'Добавьте хотя бы одно фото',
 };
 
-export function errorText(error: unknown): string {
-  if (!(error instanceof ApiError)) return 'Что-то пошло не так';
-  const base = messages[error.code] ?? 'Не удалось выполнить действие';
+export function errorText(error: unknown, t?: Translate): string {
+  if (!(error instanceof ApiError)) return t ? t('error.unexpected') : 'Что-то пошло не так';
+  // Codes a buyer can meet are in the dictionaries; seller-only ones are Russian for now.
+  const key = optionalKey(`error.${error.code}`);
+  const base =
+    (t && key ? t(key) : undefined) ??
+    messages[error.code] ??
+    (t ? t('error.generic') : 'Не удалось выполнить действие');
   if (error.code === 'not_ready' && Array.isArray(error.details)) {
     const list = error.details.map((detail) => problems[detail.problem] ?? detail.problem);
     return `${base}: ${list.join('; ').toLowerCase()}`;
@@ -75,10 +84,11 @@ export function errorText(error: unknown): string {
 }
 
 export function FormError({ error }: { error: unknown }) {
+  const { t } = useApp();
   if (!error) return null;
   return (
     <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-      {errorText(error)}
+      {errorText(error, t)}
     </p>
   );
 }

@@ -1,15 +1,25 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { LOCALE_COOKIE, parseLocale } from '@/lib/i18n';
+import { sizeGuide } from '@/lib/i18n/sizeGuide';
 
-export const metadata = { title: 'Как выбрать размер — TapWear' };
+export function generateMetadata() {
+  const text = sizeGuide[parseLocale(cookies().get(LOCALE_COOKIE)?.value)];
+  return { title: `${text.title} — TapWear` };
+}
 
 // A shirt laid flat with the measurements sellers give for a garment.
-function GarmentDiagram() {
+function GarmentDiagram({
+  title,
+  labels,
+}: {
+  title: string;
+  labels: { shoulders: string; chest: string; length: string; sleeve: string };
+}) {
   return (
     <svg viewBox="0 0 320 250" role="img" aria-labelledby="garment-title" className="w-full max-w-sm">
-      <title id="garment-title">
-        Замеры изделия: длина по спинке, ширина груди, ширина плеч и длина рукава
-      </title>
+      <title id="garment-title">{title}</title>
       <path
         d="M110 30 L140 20 Q160 34 180 20 L210 30 L270 80 L245 105 L215 85 L215 225 L105 225 L105 85 L75 105 L50 80 Z"
         fill="#eff6ff"
@@ -24,10 +34,14 @@ function GarmentDiagram() {
         <line x1="222" y1="34" x2="282" y2="84" />
       </g>
       <g fontSize="12" fill="#111827" fontFamily="inherit">
-        <text x="160" y="9" textAnchor="middle">плечи</text>
-        <text x="110" y="126" textAnchor="start">ширина груди</text>
-        <text x="166" y="180">длина</text>
-        <text x="262" y="50">рукав</text>
+        <text x="160" y="9" textAnchor="middle">
+          {labels.shoulders}
+        </text>
+        <text x="110" y="126" textAnchor="start">
+          {labels.chest}
+        </text>
+        <text x="166" y="180">{labels.length}</text>
+        <text x="262" y="50">{labels.sleeve}</text>
       </g>
     </svg>
   );
@@ -42,107 +56,85 @@ function Step({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
+function Lead({ pair }: { pair: [string, string] }) {
+  return (
+    <>
+      <strong>{pair[0]}</strong>
+      {pair[1]}
+    </>
+  );
+}
+
 export default function SizeGuidePage() {
+  const text = sizeGuide[parseLocale(cookies().get(LOCALE_COOKIE)?.value)];
+
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <header className="bg-white border-b border-gray-200">
         <div className="mx-auto max-w-3xl px-4 py-3">
-          <h1 className="text-xl font-bold text-gray-900">Как выбрать размер</h1>
+          <h1 className="text-xl font-bold text-gray-900">{text.title}</h1>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-4 space-y-4">
-        <p className="text-sm text-gray-600">
-          Размеры у магазинов разные: «L» одного продавца может быть «M» у другого. Поэтому
-          TapWear показывает размер так, как его указал продавец, и не переводит его сам.
-          Надёжнее всего сравнивать сантиметры.
-        </p>
+        <p className="text-sm text-gray-600">{text.intro}</p>
 
-        <Step title="Мерки тела и замеры изделия — разные вещи">
+        <Step title={text.difference.title}>
           <p>
-            <strong>Мерки тела</strong> — это обхваты человека: грудь, талия, бёдра. Их снимают
-            сантиметровой лентой вокруг тела.
+            <Lead pair={text.difference.body} />
           </p>
           <p>
-            <strong>Замеры изделия</strong> — это размеры самой вещи, разложенной на столе. Ширину
-            измеряют от шва до шва по одной стороне, поэтому она примерно вдвое меньше обхвата.
+            <Lead pair={text.difference.garment} />
           </p>
-          <p className="rounded-lg bg-amber-50 p-3 text-amber-900">
-            Пример: у куртки указана ширина груди 56 см. Это не значит, что она подойдёт человеку
-            с обхватом груди 56 см. Обхват самой куртки — около 112 см (56 × 2), а чтобы вещь
-            не была тесной, она должна быть заметно шире тела.
-          </p>
+          <p className="rounded-lg bg-amber-50 p-3 text-amber-900">{text.difference.example}</p>
         </Step>
 
-        <Step title="Что измеряют у вещи">
+        <Step title={text.garment.title}>
           <div className="flex flex-col items-center gap-4 md:flex-row md:items-start">
-            <GarmentDiagram />
+            <GarmentDiagram title={text.garment.diagramTitle} labels={text.garment.labels} />
             <ul className="list-disc space-y-1 pl-5">
-              <li>
-                <strong>Длина</strong> — по спинке от воротника до низа.
-              </li>
-              <li>
-                <strong>Ширина груди</strong> — от подмышки до подмышки по разложенной вещи.
-              </li>
-              <li>
-                <strong>Плечи</strong> — от одного плечевого шва до другого.
-              </li>
-              <li>
-                <strong>Рукав</strong> — от плечевого шва до края манжеты.
-              </li>
-              <li>
-                Для брюк: <strong>пояс</strong> (ширина по талии) и <strong>внутренний шов</strong>{' '}
-                (от шагового шва до низа штанины).
-              </li>
+              {text.garment.items.map((item) => (
+                <li key={item[0]}>
+                  <Lead pair={item} />
+                </li>
+              ))}
             </ul>
           </div>
         </Step>
 
-        <Step title="Самый простой способ: сравнить со своей вещью">
+        <Step title={text.compare.title}>
           <ol className="list-decimal space-y-1 pl-5">
-            <li>Возьмите вещь того же типа, которая хорошо на вас сидит.</li>
-            <li>Разложите её на ровной поверхности и расправьте.</li>
-            <li>Измерьте длину, ширину груди и рукав так, как показано на схеме.</li>
-            <li>Сравните с замерами в карточке товара или спросите их у продавца.</li>
+            {text.compare.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
           </ol>
         </Step>
 
-        <Step title="Как снять мерки тела">
+        <Step title={text.body.title}>
           <ul className="list-disc space-y-1 pl-5">
-            <li>
-              <strong>Грудь</strong> — лента горизонтально по самым выступающим точкам груди.
-            </li>
-            <li>
-              <strong>Талия</strong> — по самому узкому месту, не втягивая живот.
-            </li>
-            <li>
-              <strong>Бёдра</strong> — по самым выступающим точкам ягодиц.
-            </li>
-            <li>
-              <strong>Рост</strong> — без обуви. Для детской одежды размер часто и есть рост: 110,
-              116, 122.
-            </li>
+            {text.body.items.map((item) => (
+              <li key={item[0]}>
+                <Lead pair={item} />
+              </li>
+            ))}
           </ul>
-          <p>Все значения записывайте в сантиметрах. Лента должна прилегать, но не стягивать.</p>
+          <p>{text.body.note}</p>
         </Step>
 
-        <Step title="Чего TapWear не делает">
+        <Step title={text.limits.title}>
           <ul className="list-disc space-y-1 pl-5">
-            <li>Не определяет размер только по росту: у людей одного роста размеры бывают разными.</li>
-            <li>Не переводит «L» в числовой размер без таблицы конкретного продавца.</li>
-            <li>
-              Не придумывает замеры: если продавец их не указал, в карточке так и написано, и
-              лучше спросить у магазина.
-            </li>
+            {text.limits.items.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
           </ul>
         </Step>
 
         <p className="text-sm text-gray-600">
-          Нужны замеры конкретной вещи? Откройте товар в{' '}
+          {text.outro.before}
           <Link href="/catalog" className="text-blue-600 hover:underline">
-            каталоге
-          </Link>{' '}
-          и напишите продавцу — в сообщении уже будут указаны товар и выбранный размер.
+            {text.outro.link}
+          </Link>
+          {text.outro.after}
         </p>
       </main>
 

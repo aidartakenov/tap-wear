@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics';
 import { getProducts, getStore } from '@/lib/api';
-import { catalogHref, plural, productForms } from '@/lib/catalog';
+import { catalogHref } from '@/lib/catalog';
+import { useApp } from '@/lib/context';
 import { useApi } from '@/lib/useApi';
 
 // A store shows its whole range on its own page; 100 is the API's page limit.
@@ -22,6 +23,7 @@ const STORE_PAGE_SIZE = 100;
 export default function StoreProfilePage() {
   const slug = String(useParams().id);
   const router = useRouter();
+  const { t, count } = useApp();
   const [query, setQuery] = useState('');
 
   // One view per opened storefront, for the store's statistics.
@@ -50,18 +52,18 @@ export default function StoreProfilePage() {
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-2">
           <Link href="/stores">
-            <Button variant="ghost" size="icon" aria-label="Назад к магазинам">
+            <Button variant="ghost" size="icon" aria-label={t('store.back')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
           <h1 className="text-xl font-bold text-gray-900 truncate">
-            {data?.store.name ?? 'Магазин'}
+            {data?.store.name ?? t('store.title')}
           </h1>
         </div>
       </header>
 
       {error ? (
-        <ErrorState error={error} notFound="Магазин не найден" />
+        <ErrorState error={error} notFound={t('store.notFound')} />
       ) : loading || !data ? (
         <Loading />
       ) : (
@@ -114,13 +116,13 @@ export default function StoreProfilePage() {
           <section className="space-y-3">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold text-gray-900">
-                {plural(data.products.total, productForms)} в магазине
+                {t('store.count', { count: count(data.products.total, 'product') })}
               </h2>
               <Link
                 href={catalogHref({ store: slug })}
                 className="text-sm font-medium text-blue-600 hover:underline shrink-0"
               >
-                Фильтры по магазину
+                {t('store.filters')}
               </Link>
             </div>
             <form onSubmit={searchInStore} role="search" className="relative">
@@ -129,8 +131,8 @@ export default function StoreProfilePage() {
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Искать в этом магазине"
-                aria-label="Поиск по товарам магазина"
+                placeholder={t('store.searchPlaceholder')}
+                aria-label={t('store.searchLabel')}
                 className="w-full h-10 rounded-full border border-gray-200 bg-white pl-9 pr-4 text-base md:text-sm outline-none focus:ring-2 focus:ring-blue-600"
               />
             </form>

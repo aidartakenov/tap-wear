@@ -3,6 +3,7 @@
 import { ExternalLink, MessageCircle, Phone, Send } from 'lucide-react';
 import { ContactChannel, track } from '@/lib/analytics';
 import { formatPrice } from '@/lib/catalog';
+import { useApp } from '@/lib/context';
 import { Store } from '@/lib/types';
 
 interface ContactButtonProps {
@@ -25,19 +26,20 @@ const secondary =
   'inline-flex items-center justify-center w-full rounded-md text-sm font-medium transition-colors h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground';
 
 export function ContactButton({ store, inquiry }: ContactButtonProps) {
+  const { t } = useApp();
   const message = inquiry
     ? [
-        `Здравствуйте! Интересует товар: ${inquiry.title}`,
-        inquiry.size ? `Размер: ${inquiry.size}` : null,
-        inquiry.color ? `Цвет: ${inquiry.color}` : null,
-        `Цена: ${formatPrice(inquiry.priceMinor)}`,
+        t('message.greeting', { title: inquiry.title }),
+        inquiry.size ? t('message.size', { size: inquiry.size }) : null,
+        inquiry.color ? t('message.color', { color: inquiry.color }) : null,
+        t('message.price', { price: formatPrice(inquiry.priceMinor) }),
         inquiry.url,
         '',
-        'Подскажите, пожалуйста, есть ли в наличии?',
+        t('message.question'),
       ]
         .filter((line) => line !== null)
         .join('\n')
-    : 'Здравствуйте! Пишу вам с TapWear.';
+    : t('message.generic');
   const link = inquiry?.url ?? store.website;
 
   // Counted for the store's statistics. A click is an inquiry, not a sale.
@@ -60,7 +62,7 @@ export function ContactButton({ store, inquiry }: ContactButtonProps) {
           className={primary}
         >
           <MessageCircle className="w-4 h-4 mr-2" />
-          Написать в WhatsApp
+          {t('contact.whatsapp')}
         </a>
       ) : (
         store.phone && (
@@ -70,7 +72,7 @@ export function ContactButton({ store, inquiry }: ContactButtonProps) {
             className={primary}
           >
             <Phone className="w-4 h-4 mr-2" />
-            Позвонить {store.phone}
+            {t('contact.call', { phone: store.phone })}
           </a>
         )
       )}
@@ -83,7 +85,7 @@ export function ContactButton({ store, inquiry }: ContactButtonProps) {
           className={secondary}
         >
           <Send className="w-4 h-4 mr-2" />
-          Instagram магазина
+          {t('contact.instagram')}
         </a>
       )}
       {link && (
@@ -95,7 +97,7 @@ export function ContactButton({ store, inquiry }: ContactButtonProps) {
           className={secondary}
         >
           <ExternalLink className="w-4 h-4 mr-2" />
-          {inquiry ? 'Открыть на сайте магазина' : 'Сайт магазина'}
+          {t(inquiry ? 'contact.openOnSite' : 'contact.site')}
         </a>
       )}
     </div>

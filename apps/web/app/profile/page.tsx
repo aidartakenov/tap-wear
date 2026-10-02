@@ -14,7 +14,6 @@ import {
   secondaryButton,
 } from '@/components/form';
 import { changePassword, updateProfile } from '@/lib/api';
-import { plural, productForms } from '@/lib/catalog';
 import { useApp } from '@/lib/context';
 import { Me } from '@/lib/types';
 
@@ -47,7 +46,7 @@ function Row({
 }
 
 function AccountSettings({ me }: { me: Me }) {
-  const { setMe } = useApp();
+  const { setMe, t } = useApp();
   const [name, setName] = useState(me.name);
   const [nameState, setNameState] = useState<{ error?: unknown; saved?: boolean }>({});
   const [current, setCurrent] = useState('');
@@ -78,10 +77,12 @@ function AccountSettings({ me }: { me: Me }) {
 
   return (
     <details className="rounded-xl border border-gray-200 bg-white">
-      <summary className="cursor-pointer p-4 font-medium text-gray-900">Настройки аккаунта</summary>
+      <summary className="cursor-pointer p-4 font-medium text-gray-900">
+        {t('profile.settings')}
+      </summary>
       <div className="space-y-6 border-t border-gray-100 p-4">
         <form onSubmit={saveName} className="space-y-3">
-          <Field label="Имя">
+          <Field label={t('login.name')}>
             <input
               className={inputClass}
               value={name}
@@ -96,14 +97,14 @@ function AccountSettings({ me }: { me: Me }) {
           <FormError error={nameState.error} />
           <div className="flex items-center gap-3">
             <button type="submit" disabled={name.trim() === me.name} className={secondaryButton}>
-              Сохранить имя
+              {t('profile.saveName')}
             </button>
-            {nameState.saved && <span className="text-sm text-green-700">Сохранено</span>}
+            {nameState.saved && <span className="text-sm text-green-700">{t('common.saved')}</span>}
           </div>
         </form>
 
         <form onSubmit={savePassword} className="space-y-3">
-          <Field label="Текущий пароль">
+          <Field label={t('profile.currentPassword')}>
             <input
               className={inputClass}
               type="password"
@@ -113,7 +114,7 @@ function AccountSettings({ me }: { me: Me }) {
               required
             />
           </Field>
-          <Field label="Новый пароль" hint="Не короче 8 символов. На других устройствах нужно будет войти заново.">
+          <Field label={t('profile.newPassword')} hint={t('profile.newPasswordHint')}>
             <input
               className={inputClass}
               type="password"
@@ -127,9 +128,9 @@ function AccountSettings({ me }: { me: Me }) {
           <FormError error={passwordState.error} />
           <div className="flex items-center gap-3">
             <button type="submit" className={secondaryButton}>
-              Сменить пароль
+              {t('profile.changePassword')}
             </button>
-            {passwordState.saved && <span className="text-sm text-green-700">Пароль изменён</span>}
+            {passwordState.saved && <span className="text-sm text-green-700">{t('profile.passwordChanged')}</span>}
           </div>
         </form>
       </div>
@@ -139,13 +140,13 @@ function AccountSettings({ me }: { me: Me }) {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { me, signOut, favorites } = useApp();
+  const { me, signOut, favorites, t, count } = useApp();
 
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-6xl px-4 py-3">
-          <h1 className="text-xl font-bold text-gray-900">{me ? 'Личный кабинет' : 'Профиль'}</h1>
+          <h1 className="text-xl font-bold text-gray-900">{t(me ? 'profile.title' : 'nav.profile')}</h1>
         </div>
       </header>
 
@@ -167,13 +168,12 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <>
-                  <p className="font-semibold text-gray-900">Вы смотрите каталог как гость</p>
+                  <p className="font-semibold text-gray-900">{t('profile.guestTitle')}</p>
                   <p className="mt-1 text-sm text-gray-600">
-                    Войдите или создайте аккаунт, чтобы избранное сохранялось в нём и было
-                    доступно на всех ваших устройствах.
+                    {t('profile.guestText')}
                   </p>
                   <Link href="/login" className={`${primaryButton} mt-4`}>
-                    Войти или зарегистрироваться
+                    {t('profile.signInOrRegister')}
                   </Link>
                 </>
               )}
@@ -182,31 +182,34 @@ export default function ProfilePage() {
             <Row
               href="/favorites"
               icon={Heart}
-              title="Избранное"
+              title={t('nav.favorites')}
               text={
                 favorites.length
-                  ? `${plural(favorites.length, productForms)} · ${
-                      me ? 'сохранено в аккаунте' : 'сохранено на этом устройстве'
-                    }`
-                  : me
-                    ? 'Сохраняется в вашем аккаунте'
-                    : 'Сохраняется на этом устройстве'
+                  ? `${count(favorites.length, 'product')} · ${t(
+                      me ? 'profile.favSavedAccount' : 'profile.favSavedDevice'
+                    )}`
+                  : t(me ? 'profile.favAccount' : 'profile.favDevice')
               }
             />
             {me && (
               <Row
                 href="/cabinet"
                 icon={Store}
-                title={me.memberships.length ? 'Кабинет магазина' : 'Открыть свой магазин'}
+                title={t(me.memberships.length ? 'profile.storeCabinet' : 'profile.openStore')}
                 text={
                   me.memberships.length
                     ? me.memberships.map((m) => m.store_name).join(', ')
-                    : 'Для продавцов: витрина и товары в каталоге TapWear'
+                    : t('profile.openStoreText')
                 }
               />
             )}
             {me?.is_admin && (
-              <Row href="/admin" icon={Shield} title="Модерация" text="Проверка магазинов, товаров и жалоб" />
+              <Row
+                href="/admin"
+                icon={Shield}
+                title={t('profile.moderation')}
+                text={t('profile.moderationText')}
+              />
             )}
             {me && <AccountSettings me={me} />}
             {me && (
@@ -218,7 +221,7 @@ export default function ProfilePage() {
                 className={`${secondaryButton} w-full`}
               >
                 <LogOut className="w-4 h-4" />
-                Выйти
+                {t('profile.signOut')}
               </button>
             )}
           </>

@@ -14,6 +14,7 @@ from app.accounts.security import hash_password, new_token, token_hash, verify_p
 from app.config import get_settings
 from app.database import get_session
 from app.errors import ApiError
+from app.rate_limit import rate_limit
 from app.stores.models import Store, StoreMember
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -100,7 +101,7 @@ async def start_session(db: AsyncSession, response: Response, user: User) -> Ses
     return session
 
 
-@router.post("/register", status_code=201)
+@router.post("/register", status_code=201, dependencies=[Depends(rate_limit("register", limit=5))])
 async def register(
     body: RegisterIn, response: Response, db: AsyncSession = Depends(get_session)
 ) -> MeOut:
@@ -116,7 +117,7 @@ async def register(
     return await me_out(db, await start_session(db, response, user))
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(rate_limit("login", limit=10))])
 async def login(
     body: LoginIn, response: Response, db: AsyncSession = Depends(get_session)
 ) -> MeOut:

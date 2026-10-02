@@ -5,20 +5,15 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { DemoNotice } from '@/components/DemoNotice';
 import { ProductShelf } from '@/components/ProductShelf';
 import { getCatalogFilters, getProducts, getStores } from '@/lib/api';
-import { audienceLabels, catalogHref, plural, productForms, storeForms } from '@/lib/catalog';
+import { cookies } from 'next/headers';
+import { catalogHref } from '@/lib/catalog';
+import { LOCALE_COOKIE, Locale, Translate, countLabel, parseLocale, translator } from '@/lib/i18n';
 import { Audience, FilterState } from '@/lib/types';
 
 // The catalog changes as sellers update it, so this page is rendered per request.
 export const dynamic = 'force-dynamic';
 
 const SHELF_SIZE = 12;
-
-const audienceTaglines: Record<Audience, string> = {
-  women: 'Платья, костюмы, трикотаж',
-  men: 'Куртки, худи, джинсы',
-  kids: 'Одежда по росту ребёнка',
-  unisex: 'Подходит всем',
-};
 
 // Which products make a good tile photo. This is a presentation choice for the
 // demo catalog (photos with the garment worn, framed from the top); without a
@@ -29,17 +24,17 @@ const coverPicks: Partial<Record<Audience, Partial<FilterState>>> = {
   kids: { category: 'tshirts' },
 };
 
-async function loadHome() {
+async function loadHome(locale: Locale) {
   const [catalog, stores, mixed] = await Promise.all([
-    getCatalogFilters(),
-    getStores(),
-    getProducts({ limit: SHELF_SIZE }),
+    getCatalogFilters(undefined, locale),
+    getStores(undefined, locale),
+    getProducts({ limit: SHELF_SIZE }, undefined, locale),
   ]);
   const shelves = await Promise.all(
     catalog.audiences.map(async ({ code, cover_image }) => {
       const [shelf, pick] = await Promise.all([
-        getProducts({ filter: { audience: code }, limit: SHELF_SIZE }),
-        getProducts({ filter: { audience: code, ...coverPicks[code] }, limit: 1 }),
+        getProducts({ filter: { audience: code }, limit: SHELF_SIZE }, undefined, locale),
+        getProducts({ filter: { audience: code, ...coverPicks[code] }, limit: 1 }, undefined, locale),
       ]);
       return {
         audience: code,
@@ -52,13 +47,13 @@ async function loadHome() {
   return { catalog, stores: stores.items, mixed: mixed.items, shelves };
 }
 
-function Unavailable() {
+function Unavailable({ t }: { t: Translate }) {
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <main className="mx-auto max-w-6xl px-4 py-16 text-center">
-        <h1 className="text-xl font-bold text-gray-900">Каталог временно недоступен</h1>
+        <h1 className="text-xl font-bold text-gray-900">{t('home.unavailable')}</h1>
         <p className="mt-2 text-sm text-gray-500">
-          Не удалось получить данные с сервера. Попробуйте обновить страницу чуть позже.
+          {t('home.unavailableText')}
         </p>
       </main>
       <BottomNavigation />
@@ -67,8 +62,10 @@ function Unavailable() {
 }
 
 export default async function HomePage() {
-  const home = await loadHome().catch(() => null);
-  if (!home) return <Unavailable />;
+  const locale = parseLocale(cookies().get(LOCALE_COOKIE)?.value);
+  const t = translator(locale);
+  const home = await loadHome(locale).catch(() => null);
+  if (!home) return <Unavailable t={t} />;
   const { catalog, stores, mixed, shelves } = home;
 
   const hasDemoData = stores.some((store) => store.is_demo);
@@ -78,7 +75,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <main className="mx-auto max-w-6xl px-4 py-4 md:py-6 space-y-8 md:space-y-12">
-        <section id="audience" aria-label="Для кого" className="scroll-mt-4">
+        <section id="audience" aria-label={t('filter.audience')} className="scroll-mt-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             {tiles.map((tile, index) => (
               <Link
@@ -102,12 +99,12 @@ export default async function HomePage() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-4 md:p-6 text-white">
-                  <h2 className="text-2xl md:text-3xl font-extrabold">{audienceLabels[tile.audience]}</h2>
+                  <h2 className="text-2xl md:text-3xl font-extrabold">{t(`audience.${tile.audience}`)}</h2>
                   <p className="mt-1 text-xs md:text-sm text-gray-200">
-                    {audienceTaglines[tile.audience]}
+                    {t(`home.tagline.${tile.audience}`)}
                   </p>
                   <p className="mt-2 md:mt-3 text-xs md:text-sm font-semibold text-white">
-                    {plural(tile.count, productForms)}
+                    {countLabel(locale, tile.count, 'product')}
                   </p>
                 </div>
               </Link>
@@ -119,14 +116,13 @@ export default async function HomePage() {
           <div className="grid md:grid-cols-2 items-center">
             <div className="p-6 md:p-8">
               <p className="text-xs font-semibold uppercase tracking-widest text-blue-300 mb-3">
-                Каталог одежды Бишкека
+                {t('home.eyebrow')}
               </p>
               <h1 className="text-2xl md:text-4xl font-extrabold leading-tight tracking-tight">
-                Найдите вещь по&nbsp;фото
+                {t('home.heroTitle')}
               </h1>
               <p className="mt-3 text-sm md:text-base text-gray-300 max-w-md">
-                Загрузите скриншот или фотографию и сравните похожую одежду из магазинов города:
-                цена, размеры и контакты продавца на одной странице.
+                {t('home.heroText')}
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
@@ -134,18 +130,19 @@ export default async function HomePage() {
                   className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-100"
                 >
                   <Camera className="w-4 h-4" />
-                  Найти по фото
+                  {t('nav.photoSearch')}
                 </Link>
                 <Link
                   href="/catalog"
                   className="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
                 >
-                  Открыть каталог
+                  {t('home.openCatalog')}
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
               <p className="mt-6 text-xs text-gray-400">
-                {plural(catalog.product_count, productForms)} · {plural(stores.length, storeForms)}
+                {countLabel(locale, catalog.product_count, 'product')} ·{' '}
+                {countLabel(locale, stores.length, 'store')}
               </p>
             </div>
 
@@ -165,7 +162,7 @@ export default async function HomePage() {
         </section>
 
         <section id="categories" className="scroll-mt-4">
-          <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-3">Категории</h2>
+          <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-3">{t('home.categories')}</h2>
           <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-6 md:overflow-visible md:px-0 [scrollbar-width:thin]">
             {catalog.categories.slice(0, 12).map((category) => (
               <Link
@@ -193,13 +190,13 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <ProductShelf title="Подборка из магазинов" href="/catalog" products={mixed} />
+        <ProductShelf title={t('home.shelf')} href="/catalog" products={mixed} />
 
         <section id="stores" className="scroll-mt-4">
           <div className="flex items-end justify-between gap-3 mb-3">
-            <h2 className="text-lg md:text-xl font-bold text-gray-900">Магазины</h2>
+            <h2 className="text-lg md:text-xl font-bold text-gray-900">{t('nav.stores')}</h2>
             <Link href="/stores" className="text-sm font-medium text-blue-600 hover:underline">
-              Все магазины
+              {t('home.allStores')}
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -227,7 +224,7 @@ export default async function HomePage() {
                   </p>
                 )}
                 <p className="mt-1 text-xs text-gray-500">
-                  {plural(store.product_count, productForms)}
+                  {countLabel(locale, store.product_count, 'product')}
                 </p>
               </Link>
             ))}
@@ -237,7 +234,7 @@ export default async function HomePage() {
         {shelves.map(({ audience, products }) => (
           <ProductShelf
             key={audience}
-            title={audienceLabels[audience]}
+            title={t(`audience.${audience}`)}
             href={catalogHref({ audience })}
             products={products}
           />

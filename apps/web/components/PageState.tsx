@@ -1,33 +1,38 @@
+'use client';
+
 import { AlertCircle } from 'lucide-react';
 import { ApiError } from '@/lib/api';
+import { useApp } from '@/lib/context';
 
-export function Loading({ label = 'Загружаем…' }: { label?: string }) {
+export function Loading({ label }: { label?: string }) {
+  const { t } = useApp();
   return (
     <div className="py-16 text-center" role="status">
       <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
-      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-sm text-gray-500">{label ?? t('state.loading')}</p>
     </div>
   );
 }
 
 export function ErrorState({ error, notFound }: { error: ApiError; notFound?: string }) {
+  const { t } = useApp();
   const isNotFound = error.status === 404 || error.status === 422;
   return (
     <div className="py-16 text-center" role="alert">
       <AlertCircle className="mx-auto mb-3 h-8 w-8 text-gray-400" />
       <p className="font-medium text-gray-900">
-        {isNotFound && notFound ? notFound : 'Не удалось загрузить данные'}
+        {isNotFound && notFound ? notFound : t('state.loadError')}
       </p>
       {!isNotFound && (
         <>
           <p className="mt-1 text-sm text-gray-500">
-            Проверьте соединение и попробуйте ещё раз.
+            {t('state.checkConnection')}
           </p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
-            Обновить страницу
+            {t('state.reload')}
           </button>
         </>
       )}

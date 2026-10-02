@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     login_max_failures: int = Field(default=5, gt=0)
     login_lock_minutes: int = Field(default=15, gt=0)
 
+    # Per-address request limits on sign-in, reports, events and uploads.
+    rate_limit_enabled: bool = True
+
     # Stock freshness: hours after the last confirmation at which the seller is
     # reminded, and at which buyers stop being told "in stock".
     availability_reminder_hours: int = Field(default=48, gt=0)

@@ -48,6 +48,7 @@ from app.merchant.schemas import (
     VariantUpdate,
 )
 from app.moderation.models import ModerationLog
+from app.rate_limit import rate_limit
 from app.reference.models import Category, City, Color
 from app.stores.models import MemberRole, Store, StoreMember, StoreStatus
 
@@ -402,7 +403,11 @@ async def update_product(
     return await commit_product(db, product.id)
 
 
-@router.post("/products/{product_id}/images", status_code=201)
+@router.post(
+    "/products/{product_id}/images",
+    status_code=201,
+    dependencies=[Depends(rate_limit("uploads", limit=30))],
+)
 async def upload_image(
     product_id: uuid.UUID,
     file: UploadFile,

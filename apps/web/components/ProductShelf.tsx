@@ -1,6 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { ProductCard } from '@/components/ProductCard';
+import { useApp } from '@/lib/context';
 import { Product } from '@/lib/types';
 
 interface ProductShelfProps {
@@ -11,6 +14,7 @@ interface ProductShelfProps {
 
 // A titled row of product cards that scrolls sideways on narrow screens.
 export function ProductShelf({ title, href, products }: ProductShelfProps) {
+  const { t } = useApp();
   if (products.length === 0) return null;
 
   return (
@@ -21,7 +25,7 @@ export function ProductShelf({ title, href, products }: ProductShelfProps) {
           href={href}
           className="flex items-center text-sm font-medium text-blue-600 hover:underline shrink-0"
         >
-          Смотреть все
+          {t('shelf.seeAll')}
           <ChevronRight className="w-4 h-4" />
         </Link>
       </div>

@@ -7,12 +7,12 @@ import { FormError, primaryButton } from '@/components/form';
 import { ErrorState, ProductGridSkeleton } from '@/components/PageState';
 import { ProductCard } from '@/components/ProductCard';
 import { getProducts } from '@/lib/api';
-import { plural, productForms } from '@/lib/catalog';
 import { useApp } from '@/lib/context';
 import { useApi } from '@/lib/useApi';
 
 export default function FavoritesPage() {
-  const { me, favorites: ids, deviceOnlyFavorites, moveDeviceFavoritesToAccount } = useApp();
+  const { me, favorites: ids, deviceOnlyFavorites, moveDeviceFavoritesToAccount, t, count } =
+    useApp();
   const [moveError, setMoveError] = useState<unknown>(null);
   const [declined, setDeclined] = useState(false);
 
@@ -30,7 +30,7 @@ export default function FavoritesPage() {
     <div className="min-h-screen pb-24 md:pb-12">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-6xl px-4 py-3">
-          <h1 className="text-xl font-bold text-gray-900">Избранное</h1>
+          <h1 className="text-xl font-bold text-gray-900">{t('nav.favorites')}</h1>
         </div>
       </header>
 
@@ -38,18 +38,17 @@ export default function FavoritesPage() {
         {me && deviceOnlyFavorites.length > 0 && !declined && (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
             <p>
-              На этом устройстве до входа сохранено:{' '}
-              {plural(deviceOnlyFavorites.length, productForms)}. Добавить в ваш аккаунт?
+              {t('favorites.deviceSaved', { count: count(deviceOnlyFavorites.length, 'product') })}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => moveDeviceFavoritesToAccount().catch(setMoveError)}
                 className={primaryButton}
               >
-                Добавить в аккаунт
+                {t('favorites.addToAccount')}
               </button>
               <button onClick={() => setDeclined(true)} className="px-3 text-sm text-blue-900">
-                Не сейчас
+                {t('favorites.notNow')}
               </button>
             </div>
             <FormError error={moveError} />
@@ -57,11 +56,11 @@ export default function FavoritesPage() {
         )}
         {me === null && ids.length > 0 && (
           <p className="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-600">
-            Список хранится только на этом устройстве.{' '}
+            {t('favorites.deviceOnly')}{' '}
             <Link href="/login" className="font-medium text-blue-600 hover:underline">
-              Войдите
+              {t('favorites.signIn')}
             </Link>
-            , чтобы он был доступен на телефоне и компьютере.
+            {t('favorites.signInWhy')}
           </p>
         )}
         {error ? (
@@ -69,8 +68,8 @@ export default function FavoritesPage() {
         ) : ids.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">❤️</div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Избранное пусто</h2>
-            <p className="text-gray-600">Добавляйте товары в избранное, чтобы не потерять их</p>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('favorites.empty')}</h2>
+            <p className="text-gray-600">{t('favorites.emptyHint')}</p>
           </div>
         ) : loading && !data ? (
           <ProductGridSkeleton count={ids.length} />
@@ -83,7 +82,7 @@ export default function FavoritesPage() {
             </div>
             {unavailable > 0 && (
               <p className="text-sm text-gray-500">
-                Часть сохранённых товаров больше недоступна в каталоге: {unavailable}.
+                {t('favorites.unavailable', { n: unavailable })}
               </p>
             )}
           </>

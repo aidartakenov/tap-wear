@@ -4,20 +4,21 @@ import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Camera, Heart, Search, Store, User } from 'lucide-react';
-import { audienceLabels, catalogHref } from '@/lib/catalog';
+import { catalogHref } from '@/lib/catalog';
+import { Key, LOCALES, localeNames } from '@/lib/i18n';
 import { useApp } from '@/lib/context';
 import { cn } from '@/lib/utils';
 
-const desktopLinks = [
-  { href: '/stores', label: 'Магазины', icon: Store },
-  { href: '/favorites', label: 'Избранное', icon: Heart },
-  { href: '/profile', label: 'Профиль', icon: User },
+const desktopLinks: { href: string; label: Key; icon: typeof User }[] = [
+  { href: '/stores', label: 'nav.stores', icon: Store },
+  { href: '/favorites', label: 'nav.favorites', icon: Heart },
+  { href: '/profile', label: 'nav.profile', icon: User },
 ];
 
 export function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
-  const { favorites, catalog, me } = useApp();
+  const { favorites, catalog, me, t, locale, setLocale } = useApp();
   const audiences = catalog?.audiences ?? [];
   const categories = catalog?.categories ?? [];
   const [query, setQuery] = useState('');
@@ -34,19 +35,40 @@ export function SiteHeader() {
           Tap<span className="text-blue-600">Wear</span>
         </Link>
 
-        <form onSubmit={submitSearch} role="search" className="relative flex-1 md:max-w-md">
+        <form onSubmit={submitSearch} role="search" className="relative flex-1 md:max-w-md md:mr-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Куртка, худи, Nike…"
-            aria-label="Поиск по каталогу"
+            placeholder={t('search.placeholder')}
+            aria-label={t('search.label')}
             className="w-full h-10 rounded-full bg-gray-100 pl-9 pr-4 text-base md:text-sm text-gray-900 placeholder:text-gray-500 outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
           />
         </form>
 
-        <nav className="hidden md:flex items-center gap-1 ml-auto">
+        <div
+          role="group"
+          aria-label={t('nav.language')}
+          className="flex shrink-0 overflow-hidden rounded-full border border-gray-300 text-xs font-semibold"
+        >
+          {LOCALES.map((code) => (
+            <button
+              key={code}
+              onClick={() => code !== locale && setLocale(code)}
+              aria-pressed={code === locale}
+              title={localeNames[code]}
+              className={cn(
+                'px-2.5 py-1.5 uppercase',
+                code === locale ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+              )}
+            >
+              {code === 'ky' ? 'KG' : 'RU'}
+            </button>
+          ))}
+        </div>
+
+        <nav className="hidden md:flex items-center gap-1">
           {desktopLinks.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
@@ -57,7 +79,7 @@ export function SiteHeader() {
               )}
             >
               <Icon className="w-4 h-4" />
-              {href === '/profile' ? (me ? 'Кабинет' : 'Войти') : label}
+              {href === '/profile' ? t(me ? 'nav.cabinet' : 'nav.signIn') : t(label)}
               {href === '/favorites' && favorites.length > 0 && (
                 <span className="rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
                   {favorites.length}
@@ -70,13 +92,13 @@ export function SiteHeader() {
             className="ml-2 flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
           >
             <Camera className="w-4 h-4" />
-            Найти по фото
+            {t('nav.photoSearch')}
           </Link>
         </nav>
       </div>
 
       <nav
-        aria-label="Разделы каталога"
+        aria-label={t('nav.sections')}
         className="mx-auto max-w-6xl px-4 flex items-center gap-1 overflow-x-auto md:overflow-visible [scrollbar-width:none]"
       >
         {audiences.map(({ code: audience }) => (
@@ -85,7 +107,7 @@ export function SiteHeader() {
               href={catalogHref({ audience })}
               className="block px-3 py-2.5 text-sm font-semibold text-gray-900 border-b-2 border-transparent hover:border-gray-900"
             >
-              {audienceLabels[audience]}
+              {t(`audience.${audience}`)}
             </Link>
             {/* Category list on hover; desktop only, phones go straight to the catalog. */}
             <div className="absolute left-0 top-full z-50 hidden w-56 rounded-b-lg border border-gray-200 bg-white py-2 shadow-lg md:group-hover:block md:group-focus-within:block">
@@ -122,7 +144,7 @@ export function SiteHeader() {
           href="/catalog"
           className="shrink-0 px-3 py-2.5 text-sm text-gray-600 border-b-2 border-transparent hover:border-gray-400 hover:text-gray-900"
         >
-          Весь каталог
+          {t('nav.allCatalog')}
         </Link>
       </nav>
     </header>
