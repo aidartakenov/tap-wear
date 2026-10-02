@@ -147,6 +147,18 @@ function Catalog() {
           </div>
         )}
 
+        {filter.store !== ALL && (
+          <p className="text-sm text-gray-600">
+            Показаны товары одного магазина.{' '}
+            <button
+              onClick={() => setFilter({ store: ALL })}
+              className="font-medium text-blue-600 hover:underline"
+            >
+              Искать во всех магазинах
+            </button>
+          </p>
+        )}
+
         {error ? (
           <ErrorState error={error} />
         ) : loading && products.length === 0 ? (

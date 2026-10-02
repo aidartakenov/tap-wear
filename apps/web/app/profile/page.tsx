@@ -1,15 +1,34 @@
 'use client';
 
+import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, Heart, LogOut, Shield, Store, User } from 'lucide-react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { Loading } from '@/components/PageState';
-import { primaryButton, secondaryButton } from '@/components/form';
+import {
+  Field,
+  FormError,
+  inputClass,
+  primaryButton,
+  secondaryButton,
+} from '@/components/form';
+import { changePassword, updateProfile } from '@/lib/api';
 import { plural, productForms } from '@/lib/catalog';
 import { useApp } from '@/lib/context';
+import { Me } from '@/lib/types';
 
-function Row({ href, icon: Icon, title, text }: { href: string; icon: typeof User; title: string; text: string }) {
+function Row({
+  href,
+  icon: Icon,
+  title,
+  text,
+}: {
+  href: string;
+  icon: typeof User;
+  title: string;
+  text: string;
+}) {
   return (
     <Link
       href={href}
@@ -18,24 +37,115 @@ function Row({ href, icon: Icon, title, text }: { href: string; icon: typeof Use
       <span className="rounded-full bg-gray-100 p-2.5 text-gray-700">
         <Icon className="w-5 h-5" />
       </span>
-      <span className="flex-1">
+      <span className="flex-1 min-w-0">
         <span className="block font-medium text-gray-900">{title}</span>
-        <span className="block text-sm text-gray-600">{text}</span>
+        <span className="block text-sm text-gray-600 truncate">{text}</span>
       </span>
       <ChevronRight className="w-5 h-5 text-gray-400" />
     </Link>
   );
 }
 
+function AccountSettings({ me }: { me: Me }) {
+  const { setMe } = useApp();
+  const [name, setName] = useState(me.name);
+  const [nameState, setNameState] = useState<{ error?: unknown; saved?: boolean }>({});
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [passwordState, setPasswordState] = useState<{ error?: unknown; saved?: boolean }>({});
+
+  const saveName = async (event: FormEvent) => {
+    event.preventDefault();
+    try {
+      setMe(await updateProfile(name));
+      setNameState({ saved: true });
+    } catch (error) {
+      setNameState({ error });
+    }
+  };
+
+  const savePassword = async (event: FormEvent) => {
+    event.preventDefault();
+    try {
+      await changePassword(current, next);
+      setCurrent('');
+      setNext('');
+      setPasswordState({ saved: true });
+    } catch (error) {
+      setPasswordState({ error });
+    }
+  };
+
+  return (
+    <details className="rounded-xl border border-gray-200 bg-white">
+      <summary className="cursor-pointer p-4 font-medium text-gray-900">Настройки аккаунта</summary>
+      <div className="space-y-6 border-t border-gray-100 p-4">
+        <form onSubmit={saveName} className="space-y-3">
+          <Field label="Имя">
+            <input
+              className={inputClass}
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+                setNameState({});
+              }}
+              required
+              maxLength={100}
+            />
+          </Field>
+          <FormError error={nameState.error} />
+          <div className="flex items-center gap-3">
+            <button type="submit" disabled={name.trim() === me.name} className={secondaryButton}>
+              Сохранить имя
+            </button>
+            {nameState.saved && <span className="text-sm text-green-700">Сохранено</span>}
+          </div>
+        </form>
+
+        <form onSubmit={savePassword} className="space-y-3">
+          <Field label="Текущий пароль">
+            <input
+              className={inputClass}
+              type="password"
+              value={current}
+              onChange={(event) => setCurrent(event.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </Field>
+          <Field label="Новый пароль" hint="Не короче 8 символов. На других устройствах нужно будет войти заново.">
+            <input
+              className={inputClass}
+              type="password"
+              value={next}
+              onChange={(event) => setNext(event.target.value)}
+              autoComplete="new-password"
+              required
+              minLength={8}
+            />
+          </Field>
+          <FormError error={passwordState.error} />
+          <div className="flex items-center gap-3">
+            <button type="submit" className={secondaryButton}>
+              Сменить пароль
+            </button>
+            {passwordState.saved && <span className="text-sm text-green-700">Пароль изменён</span>}
+          </div>
+        </form>
+      </div>
+    </details>
+  );
+}
+
 export default function ProfilePage() {
   const router = useRouter();
-  const { me, signOut, state } = useApp();
+  const { me, signOut, favorites } = useApp();
 
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-6xl px-4 py-3">
-          <h1 className="text-xl font-bold text-gray-900">Профиль</h1>
+          <h1 className="text-xl font-bold text-gray-900">{me ? 'Личный кабинет' : 'Профиль'}</h1>
         </div>
       </header>
 
@@ -59,11 +169,11 @@ export default function ProfilePage() {
                 <>
                   <p className="font-semibold text-gray-900">Вы смотрите каталог как гость</p>
                   <p className="mt-1 text-sm text-gray-600">
-                    Искать, смотреть товары и сохранять избранное можно без регистрации. Аккаунт
-                    нужен владельцам и сотрудникам магазинов.
+                    Войдите или создайте аккаунт, чтобы избранное сохранялось в нём и было
+                    доступно на всех ваших устройствах.
                   </p>
                   <Link href="/login" className={`${primaryButton} mt-4`}>
-                    Вход для магазинов
+                    Войти или зарегистрироваться
                   </Link>
                 </>
               )}
@@ -74,26 +184,31 @@ export default function ProfilePage() {
               icon={Heart}
               title="Избранное"
               text={
-                state.favorites.length
-                  ? `Сохранено на этом устройстве: ${plural(state.favorites.length, productForms)}`
-                  : 'Сохраняется на этом устройстве'
+                favorites.length
+                  ? `${plural(favorites.length, productForms)} · ${
+                      me ? 'сохранено в аккаунте' : 'сохранено на этом устройстве'
+                    }`
+                  : me
+                    ? 'Сохраняется в вашем аккаунте'
+                    : 'Сохраняется на этом устройстве'
               }
             />
             {me && (
               <Row
                 href="/cabinet"
                 icon={Store}
-                title="Кабинет магазина"
+                title={me.memberships.length ? 'Кабинет магазина' : 'Открыть свой магазин'}
                 text={
                   me.memberships.length
                     ? me.memberships.map((m) => m.store_name).join(', ')
-                    : 'Создайте магазин и добавьте товары'
+                    : 'Для продавцов: витрина и товары в каталоге TapWear'
                 }
               />
             )}
             {me?.is_admin && (
               <Row href="/admin" icon={Shield} title="Модерация" text="Проверка магазинов, товаров и жалоб" />
             )}
+            {me && <AccountSettings me={me} />}
             {me && (
               <button
                 onClick={async () => {

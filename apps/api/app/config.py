@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = "TopWear API"
+    app_name: str = "TapWear API"
     environment: Literal["local", "staging", "production"] = "local"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     # Sessions. The cookie is HttpOnly; it is marked Secure everywhere except local development.
-    session_cookie_name: str = "topwear_session"
+    session_cookie_name: str = "tapwear_session"
     session_ttl_hours: int = Field(default=24 * 14, gt=0)
     login_max_failures: int = Field(default=5, gt=0)
     login_lock_minutes: int = Field(default=15, gt=0)
@@ -44,8 +44,8 @@ class Settings(BaseSettings):
     minio_secret_key: SecretStr
     minio_secure: bool = False
     minio_region: str = "us-east-1"
-    minio_bucket_assets: str = "topwear-assets"
-    minio_bucket_search_queries: str = "topwear-search-queries"
+    minio_bucket_assets: str = "tapwear-assets"
+    minio_bucket_search_queries: str = "tapwear-search-queries"
     # Base URL under which buyers' browsers can fetch public product photos.
     storage_public_url: str = "http://localhost:9000"
 

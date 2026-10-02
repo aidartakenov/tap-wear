@@ -1,8 +1,9 @@
 'use client';
 
+import { FormEvent, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, Clock, MapPin, Phone } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, Clock, MapPin, Phone, Search } from 'lucide-react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { ContactButton } from '@/components/ContactButton';
 import { DemoNotice } from '@/components/DemoNotice';
@@ -19,6 +20,14 @@ const STORE_PAGE_SIZE = 100;
 
 export default function StoreProfilePage() {
   const slug = String(useParams().id);
+  const router = useRouter();
+  const [query, setQuery] = useState('');
+
+  // Search starts inside this store; the catalog page offers to widen it to all stores.
+  const searchInStore = (event: FormEvent) => {
+    event.preventDefault();
+    router.push(catalogHref({ store: slug, query }));
+  };
   const { data, error, loading } = useApi(
     async (signal) => {
       const [store, products] = await Promise.all([
@@ -101,15 +110,24 @@ export default function StoreProfilePage() {
               <h2 className="font-semibold text-gray-900">
                 {plural(data.products.total, productForms)} в магазине
               </h2>
-              <div className="flex gap-3 text-sm font-medium shrink-0">
-                <Link href={catalogHref({ store: slug })} className="text-blue-600 hover:underline">
-                  Фильтры
-                </Link>
-                <Link href="/catalog" className="text-blue-600 hover:underline">
-                  Все магазины
-                </Link>
-              </div>
+              <Link
+                href={catalogHref({ store: slug })}
+                className="text-sm font-medium text-blue-600 hover:underline shrink-0"
+              >
+                Фильтры по магазину
+              </Link>
             </div>
+            <form onSubmit={searchInStore} role="search" className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Искать в этом магазине"
+                aria-label="Поиск по товарам магазина"
+                className="w-full h-10 rounded-full border border-gray-200 bg-white pl-9 pr-4 text-base md:text-sm outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </form>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {data.products.items.map((product) => (
                 <ProductCard key={product.id} product={product} />

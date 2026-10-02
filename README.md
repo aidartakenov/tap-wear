@@ -1,8 +1,8 @@
-# TopWear
+# TapWear
 
 Clothing catalog for Kyrgyzstan with visual search: a buyer uploads a photo or screenshot, selects the garment, and gets similar items from connected stores with price, size and availability.
 
-The full specification (in Russian) is in [docs/TopWear_TZ_v3.md](docs/TopWear_TZ_v3.md).
+The full specification (in Russian) is in [docs/TapWear_TZ_v3.md](docs/TapWear_TZ_v3.md).
 
 ## Repository layout
 
@@ -20,7 +20,7 @@ All work happens on the `development` branch.
 
 `apps/api/seed/demo_catalog.json` holds about 30 products each from the public sites of four Bishkek stores (Gergert Sport, Dresscode, ЛИРУС, adidas Кыргызстан). It exists so the product can be developed against realistic data. `python -m app.seed` loads it into the database, where these stores are flagged `is_demo`.
 
-- These stores have **not** agreed to take part in TopWear. The data is for local development and must not go into a public release or be presented as live offers.
+- These stores have **not** agreed to take part in TapWear. The data is for local development and must not go into a public release or be presented as live offers.
 - Product photos are not stored in this repository. The catalog holds links to the images on the stores' own servers.
 - Prices and availability are a snapshot from the import date and may be out of date.
 
@@ -75,8 +75,8 @@ Requirements: Docker Desktop, Python 3.11+, [uv](https://docs.astral.sh/uv/), No
 
 ## Accounts and roles
 
-- **Buyers** need no account: catalog, search, favorites and reporting a problem all work as a guest.
-- **Sellers** register at `/login`, create a store in `/cabinet`, and add products. A store and each product are reviewed by an administrator before they become public. The owner can add staff, who manage products but not the store profile or its members.
+- **Buyers** can use everything as a guest: catalog, search, favorites (kept on the device) and reporting a problem. With an account (`/login`), favorites are stored in the account and follow the buyer across devices; a list saved as a guest can be added to the account after signing in.
+- **Sellers** use the same kind of account, create a store in `/cabinet`, and add products. A store and each product are reviewed by an administrator before they become public. The owner can add staff, who manage products but not the store profile or its members.
 - **Administrators** review stores, products and buyer reports at `/admin`. An administrator is created only from the command line:
 
   ```bash
@@ -88,7 +88,7 @@ Sessions use an HttpOnly cookie; every changing request must also carry the sess
 
 ## Checks
 
-From `apps/api` (the tests use a separate `topwear_test` database and a separate `topwear-test-assets` bucket; the ones that need Postgres or object storage are skipped if it is not running):
+From `apps/api` (the tests use a separate `tapwear_test` database and a separate `tapwear-test-assets` bucket; the ones that need Postgres or object storage are skipped if it is not running):
 
 ```bash
 .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/pytest

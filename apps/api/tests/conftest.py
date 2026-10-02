@@ -14,19 +14,19 @@ from sqlalchemy.pool import NullPool
 # Tests run against a separate database on the same server as development, so
 # they can never touch development data. Settings are read at import time, so
 # the variables must be set before the app is imported.
-TEST_DATABASE = "topwear_test"
+TEST_DATABASE = "tapwear_test"
 dotenv = dotenv_values(Path(__file__).resolve().parent.parent / ".env")
 configured = (
     os.environ.get("DATABASE_URL")
     or dotenv.get("DATABASE_URL")
-    or "postgresql+asyncpg://topwear:topwear_password@localhost:5432/topwear_db"
+    or "postgresql+asyncpg://tapwear:tapwear_password@localhost:5432/tapwear_db"
 )
 development_url = make_url(configured)
 test_url = development_url.set(database=TEST_DATABASE)
 
 os.environ["DATABASE_URL"] = test_url.render_as_string(hide_password=False)
 # Uploaded test photos go to their own bucket, never the development one.
-os.environ["MINIO_BUCKET_ASSETS"] = "topwear-test-assets"
+os.environ["MINIO_BUCKET_ASSETS"] = "tapwear-test-assets"
 if not dotenv.get("MINIO_ACCESS_KEY"):
     os.environ.setdefault("MINIO_ACCESS_KEY", "test")
     os.environ.setdefault("MINIO_SECRET_KEY", "test")
@@ -50,7 +50,7 @@ from app.stores.models import Store, StoreStatus  # noqa: E402
 
 SOM = 100  # minor units in one som
 PASSWORD = "correct horse battery"
-ADMIN_EMAIL = "admin@topwear.test"
+ADMIN_EMAIL = "admin@tapwear.test"
 POSITIONS = itertools.count()
 
 IDS = {

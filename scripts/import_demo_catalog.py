@@ -1,7 +1,7 @@
 """Build the demo catalog from the public sites of four Bishkek stores.
 
 The output is DEMO data for local development only: these stores have not agreed
-to take part in TopWear. Images are referenced by URL on the stores' own servers
+to take part in TapWear. Images are referenced by URL on the stores' own servers
 and are not copied into the repository.
 
 Usage (standard library only):
@@ -27,7 +27,7 @@ from pathlib import Path
 OUTPUT = Path(__file__).resolve().parent.parent / "apps/api/seed/demo_catalog.json"
 PER_STORE = 30
 DELAY_SECONDS = 0.6
-USER_AGENT = "Mozilla/5.0 (TopWear demo catalog import; local development)"
+USER_AGENT = "Mozilla/5.0 (TapWear demo catalog import; local development)"
 
 STORES = [
     {

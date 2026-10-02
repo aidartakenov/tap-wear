@@ -2,10 +2,9 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import * as api from './api';
-import { AppState, CatalogFilters, Me } from './types';
+import { CatalogFilters, Me } from './types';
 
 interface AppContextType {
-  state: AppState;
   // What the catalog contains (audiences, categories, sizes, stores); null if the API is down.
   catalog: CatalogFilters | null;
   // The signed-in account: undefined while it is being checked, null for a guest.
@@ -13,19 +12,21 @@ interface AppContextType {
   signIn: (email: string, password: string) => Promise<Me>;
   signUp: (email: string, password: string, name: string) => Promise<Me>;
   signOut: () => Promise<void>;
+  setMe: (me: Me) => void;
+  // Saved product ids: the account's list when signed in, otherwise this device's list.
+  favorites: string[];
   toggleFavorite: (productId: string) => void;
   isFavorite: (productId: string) => boolean;
+  // Products saved on this device as a guest that are not in the account yet.
+  deviceOnlyFavorites: string[];
+  // Adds them to the account and clears the device list.
+  moveDeviceFavoritesToAccount: () => Promise<void>;
 }
 
-const FAVORITES_KEY = 'topwear.favorites';
-
-const defaultState: AppState = {
-  favorites: [],
-};
+const FAVORITES_KEY = 'tapwear.favorites';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function AppProvider({
   children,
@@ -34,13 +35,45 @@ export function AppProvider({
   children: ReactNode;
   catalog: CatalogFilters | null;
 }) {
-  const [state, setState] = useState<AppState>(defaultState);
-  const [favoritesLoaded, setFavoritesLoaded] = useState(false);
-  const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const [me, setAccount] = useState<Me | null | undefined>(undefined);
+  // A guest's list lives on the device (spec CAT07); an account's list lives on the server.
+  const [deviceFavorites, setDeviceFavorites] = useState<string[]>([]);
+  const [deviceLoaded, setDeviceLoaded] = useState(false);
+  const [accountFavorites, setAccountFavorites] = useState<string[]>([]);
+
+  // Storage can be unavailable (private mode), so the app must work without it.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(FAVORITES_KEY) ?? '[]');
+      if (Array.isArray(saved)) {
+        setDeviceFavorites(saved.filter((id) => typeof id === 'string' && UUID.test(id)));
+      }
+    } catch {
+      // Ignore unreadable storage and start with an empty list.
+    }
+    setDeviceLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!deviceLoaded) return;
+    try {
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(deviceFavorites));
+    } catch {
+      // The list then lasts only for this visit.
+    }
+  }, [deviceFavorites, deviceLoaded]);
 
   const remember = (account: Me | null) => {
     api.setCsrfToken(account?.csrf_token ?? null);
-    setMe(account);
+    setAccount(account);
+    if (account) {
+      api
+        .getFavoriteIds()
+        .then((list) => setAccountFavorites(list.ids))
+        .catch(() => setAccountFavorites([]));
+    } else {
+      setAccountFavorites([]);
+    }
     return account;
   };
 
@@ -60,54 +93,55 @@ export function AppProvider({
     await api.logout().catch(() => undefined);
     remember(null);
   };
-
-  // Guest favorites are kept on the device (spec CAT07). Storage can be
-  // unavailable (private mode), so the app must work without it.
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(FAVORITES_KEY) ?? '[]');
-      if (Array.isArray(saved)) {
-        setState((prev) => ({ ...prev, favorites: saved.filter((id) => typeof id === 'string' && UUID.test(id)) }));
-      }
-    } catch {
-      // Ignore unreadable storage and start with an empty list.
-    }
-    setFavoritesLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (!favoritesLoaded) return;
-    try {
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(state.favorites));
-    } catch {
-      // Favorites then last only for this visit.
-    }
-  }, [state.favorites, favoritesLoaded]);
-
-  const toggleFavorite = (productId: string) => {
-    setState((prev) => ({
-      ...prev,
-      favorites: prev.favorites.includes(productId)
-        ? prev.favorites.filter((id) => id !== productId)
-        : [...prev.favorites, productId],
-    }));
+  const setMe = (account: Me) => {
+    api.setCsrfToken(account.csrf_token);
+    setAccount(account);
   };
 
-  const isFavorite = (productId: string) => {
-    return state.favorites.includes(productId);
+  const favorites = me ? accountFavorites : deviceFavorites;
+
+  const toggleFavorite = (productId: string) => {
+    const saved = favorites.includes(productId);
+    if (!me) {
+      setDeviceFavorites((current) =>
+        saved ? current.filter((id) => id !== productId) : [productId, ...current]
+      );
+      return;
+    }
+    // Show the change at once, then take the server's list; undo if the request fails.
+    const before = accountFavorites;
+    setAccountFavorites(
+      saved ? before.filter((id) => id !== productId) : [productId, ...before]
+    );
+    (saved ? api.removeFavorite(productId) : api.addFavorite(productId))
+      .then((list) => setAccountFavorites(list.ids))
+      .catch(() => setAccountFavorites(before));
+  };
+
+  const deviceOnlyFavorites = me
+    ? deviceFavorites.filter((id) => !accountFavorites.includes(id))
+    : [];
+
+  const moveDeviceFavoritesToAccount = async () => {
+    const list = await api.mergeFavorites(deviceFavorites);
+    setAccountFavorites(list.ids);
+    setDeviceFavorites([]);
   };
 
   return (
     <AppContext.Provider
       value={{
-        state,
         catalog,
         me,
         signIn,
         signUp,
         signOut,
+        setMe,
+        favorites,
         toggleFavorite,
-        isFavorite,
+        isFavorite: (productId) => favorites.includes(productId),
+        deviceOnlyFavorites,
+        moveDeviceFavoritesToAccount,
       }}
     >
       {children}

@@ -1,14 +1,15 @@
-name: topwear
+# Named "tapwear-dev" so its volumes cannot collide with another local project called "tapwear".
+name: tapwear-dev
 
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: topwear-postgres
+    container_name: tapwear-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-topwear}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-topwear_password}
-      POSTGRES_DB: ${POSTGRES_DB:-topwear_db}
+      POSTGRES_USER: ${POSTGRES_USER:-tapwear}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tapwear_password}
+      POSTGRES_DB: ${POSTGRES_DB:-tapwear_db}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -24,7 +25,7 @@ services:
   minio:
     # MinIO stopped publishing its own images; this is the same server packaged by Chainguard.
     image: cgr.dev/chainguard/minio:latest
-    container_name: topwear-minio
+    container_name: tapwear-minio
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":9001"]
     environment:

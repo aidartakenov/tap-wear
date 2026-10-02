@@ -34,7 +34,7 @@ export function ContactButton({ store, inquiry }: ContactButtonProps) {
       ]
         .filter((line) => line !== null)
         .join('\n')
-    : 'Здравствуйте! Пишу вам с TopWear.';
+    : 'Здравствуйте! Пишу вам с TapWear.';
   const link = inquiry?.url ?? store.website;
 
   return (

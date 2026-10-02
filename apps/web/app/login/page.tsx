@@ -22,8 +22,8 @@ export default function LoginPage() {
     setError(null);
     try {
       const me = await (mode === 'login' ? signIn(email, password) : signUp(email, password, name));
-      // Sellers land in their cabinet; a new account starts by creating a store.
-      router.push(me.is_admin ? '/admin' : '/cabinet');
+      // Administrators and sellers land in their work area, buyers in their profile.
+      router.push(me.is_admin ? '/admin' : me.memberships.length ? '/cabinet' : '/profile');
     } catch (cause) {
       setError(cause);
       setBusy(false);
@@ -48,9 +48,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <main className="mx-auto max-w-md px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900">Кабинет магазина</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {mode === 'login' ? 'Вход в TapWear' : 'Новый аккаунт'}
+        </h1>
         <p className="mt-1 text-sm text-gray-600">
-          Вход для владельцев и сотрудников магазинов. Покупателям аккаунт не нужен.
+          С аккаунтом избранное доступно на всех ваших устройствах. Владельцы магазинов из
+          аккаунта управляют своими товарами. Искать и смотреть каталог можно и без входа.
         </p>
 
         <div className="mt-6 flex gap-1 rounded-lg bg-gray-100 p-1">

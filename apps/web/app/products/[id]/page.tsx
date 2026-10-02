@@ -135,7 +135,12 @@ function ProductView({ product }: { product: ProductDetail }) {
           ) : (
             <p className="text-sm text-gray-600">Магазин не указал размеры. Уточните у продавца.</p>
           )}
-          <p className="text-xs text-gray-500 mt-2">Замеры изделия продавец не указал.</p>
+          <p className="text-xs text-gray-500 mt-2">
+            Замеры изделия продавец не указал.{' '}
+            <Link href="/size-guide" className="text-blue-600 hover:underline">
+              Как выбрать размер
+            </Link>
+          </p>
         </div>
 
         {product.description && (

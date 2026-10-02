@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import health
+from app.accounts.me_router import router as me_router
 from app.accounts.router import router as auth_router
 from app.catalog.router import router as catalog_router
 from app.config import get_settings
@@ -46,5 +47,12 @@ install_error_handling(app)
 app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(catalog_router, prefix=settings.api_v1_prefix)
 app.include_router(stores_router, prefix=settings.api_v1_prefix)
-for router in (auth_router, merchant_router, admin_router, reports_router, reference_router):
+for router in (
+    auth_router,
+    me_router,
+    merchant_router,
+    admin_router,
+    reports_router,
+    reference_router,
+):
     app.include_router(router, prefix=settings.api_v1_prefix)

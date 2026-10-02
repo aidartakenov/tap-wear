@@ -9,7 +9,7 @@ import { getCatalogFilters } from "@/lib/api";
 const inter = Inter({ subsets: ['latin', 'cyrillic'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
-  title: "TopWear - Каталог одежды",
+  title: "TapWear - Каталог одежды",
   description: "Каталог одежды для Кыргызстана с визуальным поиском",
 };
 

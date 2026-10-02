@@ -1,17 +1,22 @@
 'use client';
 
+import { useState } from 'react';
+import Link from 'next/link';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { FormError, primaryButton } from '@/components/form';
 import { ErrorState, ProductGridSkeleton } from '@/components/PageState';
 import { ProductCard } from '@/components/ProductCard';
 import { getProducts } from '@/lib/api';
+import { plural, productForms } from '@/lib/catalog';
 import { useApp } from '@/lib/context';
 import { useApi } from '@/lib/useApi';
 
 export default function FavoritesPage() {
-  const { state } = useApp();
-  const ids = state.favorites;
+  const { me, favorites: ids, deviceOnlyFavorites, moveDeviceFavoritesToAccount } = useApp();
+  const [moveError, setMoveError] = useState<unknown>(null);
+  const [declined, setDeclined] = useState(false);
 
-  // Favorites are stored on the device as ids; the current product data comes
+  // Favorites are stored as ids (in the account, or on the device for a guest); the current product data comes
   // from the API, so prices are up to date and removed products drop out.
   const { data, error, loading } = useApi(
     async (signal) => (ids.length ? getProducts({ ids, limit: 100 }, signal) : null),
@@ -30,6 +35,35 @@ export default function FavoritesPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-4 space-y-3">
+        {me && deviceOnlyFavorites.length > 0 && !declined && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+            <p>
+              На этом устройстве до входа сохранено:{' '}
+              {plural(deviceOnlyFavorites.length, productForms)}. Добавить в ваш аккаунт?
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => moveDeviceFavoritesToAccount().catch(setMoveError)}
+                className={primaryButton}
+              >
+                Добавить в аккаунт
+              </button>
+              <button onClick={() => setDeclined(true)} className="px-3 text-sm text-blue-900">
+                Не сейчас
+              </button>
+            </div>
+            <FormError error={moveError} />
+          </div>
+        )}
+        {me === null && ids.length > 0 && (
+          <p className="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-600">
+            Список хранится только на этом устройстве.{' '}
+            <Link href="/login" className="font-medium text-blue-600 hover:underline">
+              Войдите
+            </Link>
+            , чтобы он был доступен на телефоне и компьютере.
+          </p>
+        )}
         {error ? (
           <ErrorState error={error} />
         ) : ids.length === 0 ? (

@@ -52,6 +52,7 @@ const messages: Record<string, string> = {
   already_member: 'У этого человека уже есть доступ',
   product_blocked: 'Товар заблокирован администратором',
   store_blocked: 'Магазин заблокирован администратором',
+  wrong_password: 'Текущий пароль указан неверно',
   network_error: 'Не удалось связаться с сервером',
   unauthorized: 'Войдите в аккаунт',
   forbidden: 'Недостаточно прав',

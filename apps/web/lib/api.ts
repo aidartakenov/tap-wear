@@ -156,6 +156,24 @@ export const register = (email: string, password: string, name: string) =>
   send<Me>('POST', '/auth/register', { email, password, name });
 export const logout = () => send<void>('POST', '/auth/logout');
 
+export const updateProfile = (name: string) => send<Me>('PATCH', '/auth/me', { name });
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  send<void>('POST', '/auth/password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+
+// Saved products of the signed-in account. Each call returns the full list, newest first.
+type FavoriteIds = { ids: string[] };
+export const getFavoriteIds = (signal?: AbortSignal) =>
+  get<FavoriteIds>('/me/favorites', undefined, signal);
+export const addFavorite = (productId: string) =>
+  send<FavoriteIds>('PUT', `/me/favorites/${productId}`);
+export const removeFavorite = (productId: string) =>
+  send<FavoriteIds>('DELETE', `/me/favorites/${productId}`);
+export const mergeFavorites = (ids: string[]) =>
+  send<FavoriteIds>('POST', '/me/favorites/merge', { ids });
+
 // --- Seller cabinet -----------------------------------------------------------
 
 export const getReference = (signal?: AbortSignal) =>

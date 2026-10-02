@@ -114,10 +114,6 @@ export interface FilterState {
   sort: SortOrder;
 }
 
-export interface AppState {
-  favorites: string[];
-}
-
 // --- Accounts, seller cabinet and moderation ---------------------------------
 
 export type MemberRole = 'owner' | 'staff';

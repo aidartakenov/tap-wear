@@ -17,7 +17,7 @@ const desktopLinks = [
 export function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
-  const { state, catalog } = useApp();
+  const { favorites, catalog, me } = useApp();
   const audiences = catalog?.audiences ?? [];
   const categories = catalog?.categories ?? [];
   const [query, setQuery] = useState('');
@@ -31,7 +31,7 @@ export function SiteHeader() {
     <header className="bg-white border-b border-gray-200">
       <div className="mx-auto max-w-6xl px-4 h-14 flex items-center gap-3 md:gap-6">
         <Link href="/" className="text-xl font-extrabold tracking-tight text-gray-900 shrink-0">
-          Top<span className="text-blue-600">Wear</span>
+          Tap<span className="text-blue-600">Wear</span>
         </Link>
 
         <form onSubmit={submitSearch} role="search" className="relative flex-1 md:max-w-md">
@@ -57,10 +57,10 @@ export function SiteHeader() {
               )}
             >
               <Icon className="w-4 h-4" />
-              {label}
-              {href === '/favorites' && state.favorites.length > 0 && (
+              {href === '/profile' ? (me ? 'Кабинет' : 'Войти') : label}
+              {href === '/favorites' && favorites.length > 0 && (
                 <span className="rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
-                  {state.favorites.length}
+                  {favorites.length}
                 </span>
               )}
             </Link>
