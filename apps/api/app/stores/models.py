@@ -35,6 +35,17 @@ class StoreAudience(StrEnum):
     KIDS = "kids"
 
 
+class CabinetTheme(StrEnum):
+    """Colours of a store's cabinet (the seller's pages); the owner picks one."""
+
+    BLACK = "black"
+    PINK = "pink"
+    GREEN = "green"
+    BLUE = "blue"
+    ORANGE = "orange"
+    RAINBOW = "rainbow"
+
+
 class Store(Base):
     __tablename__ = "stores"
     __table_args__ = (
@@ -52,6 +63,8 @@ class Store(Base):
     audiences: Mapped[list[str]] = mapped_column(
         ARRAY(String(10)), default=list, server_default=text("'{}'")
     )
+    # A CabinetTheme code. Only the store's own people see it, in the cabinet.
+    cabinet_theme: Mapped[str] = mapped_column(String(10), default="black", server_default="black")
     address: Mapped[str | None] = mapped_column(String(300))
     # Dordoi and other markets: these help a buyer find the stall.
     market: Mapped[str | None] = mapped_column(String(100))
@@ -62,6 +75,10 @@ class Store(Base):
     whatsapp: Mapped[str | None] = mapped_column(String(50))
     instagram: Mapped[str | None] = mapped_column(String(100))
     website: Mapped[str | None] = mapped_column(String(300))
+    # The Telegram chat that gets this store's order notices, once connected,
+    # and the one-time code the owner starts the bot with.
+    telegram_chat_id: Mapped[str | None] = mapped_column(String(40))
+    telegram_code: Mapped[str | None] = mapped_column(String(40))
     # Object key of the store's avatar (a square picture); NULL when none was uploaded.
     avatar_key: Mapped[str | None] = mapped_column(String(300))
     status: Mapped[str] = mapped_column(String(20), default=StoreStatus.PENDING_REVIEW)

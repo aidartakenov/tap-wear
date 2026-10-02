@@ -107,6 +107,36 @@ Registration sends a confirmation link; opening a store requires a confirmed add
 
 With `EMAIL_BACKEND=console` (the default) messages are written to the API log and nothing is sent. In local development they can also be read at `http://localhost:8000/api/v1/dev/outbox`. For real delivery set `EMAIL_BACKEND=smtp` and the `SMTP_*` variables.
 
+## Photo search
+
+`apps/api/app/search` holds everything around the image model: the vector table
+(`product_embeddings`, pgvector), the indexer and `POST /api/v1/search/visual`,
+which applies the catalog filters first and then ranks by cosine distance.
+
+The model plugs in through one setting, `EMBEDDER` (see `app/search/embedder.py`):
+
+- unset: `app.search.placeholder:PlaceholderEmbedder`, a colour-only stand-in
+  that is **not a model**. Tests and a fresh checkout use it, so nothing heavy
+  needs installing.
+- `app.search.hf_embedder:HFEmbedder`: a real model from Hugging Face, by
+  default SigLIP B/16 with solid bars trimmed off the photo. It needs
+  `pip install -r requirements-ml.txt` (PyTorch) and downloads the model once.
+
+How that model was chosen, with the measurements, is in `ml/README.md`. A new
+model or a change in how pictures are prepared must get a new version
+(`EMBEDDER_MODEL`, `EMBEDDER_REVISION`): the catalog then indexes again and
+vectors of different versions are never mixed.
+
+A product's photos are indexed right after it is approved. To index everything
+that is missing (for example after changing the model):
+
+```bash
+cd apps/api
+python -m app.search.indexer                 # once
+python -m app.search.indexer --retry-failed  # also photos that failed before
+python -m app.search.indexer --watch         # keep running
+```
+
 ## Deployment
 
 `infra/docker-compose.prod.yml` runs the whole product on one server behind Caddy with automatic HTTPS. Installation, updates, rollback, backups and restore are described in [docs/RUNBOOK.md](docs/RUNBOOK.md). GitHub Actions (`.github/workflows/ci.yml`) runs lint, tests and a web build on every push to `development` and `main`.

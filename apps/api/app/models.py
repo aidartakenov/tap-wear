@@ -4,8 +4,9 @@ from app.accounts.models import AccountToken, Favorite, Session, User
 from app.analytics.models import Event
 from app.catalog.models import Product, ProductImage, ProductVariant
 from app.moderation.models import ModerationLog, Report
-from app.orders.models import Order, Payment
+from app.orders.models import Order, OrderEvent, OrderItem, Payment, ShopSale
 from app.reference.models import Category, City, Color
+from app.search.models import ProductEmbedding
 from app.stores.models import Store, StoreMember, StorePolicy
 
 __all__ = [
@@ -17,12 +18,16 @@ __all__ = [
     "Favorite",
     "ModerationLog",
     "Order",
+    "OrderEvent",
+    "OrderItem",
     "Payment",
     "Product",
+    "ProductEmbedding",
     "ProductImage",
     "ProductVariant",
     "Report",
     "Session",
+    "ShopSale",
     "Store",
     "StoreMember",
     "StorePolicy",

@@ -1,5 +1,6 @@
 import { ALL } from './catalog';
 import {
+  Availability,
   CatalogFilters,
   Decision,
   FilterState,
@@ -20,8 +21,13 @@ import {
   StoreAnalytics,
   StoreInput,
   VariantInput,
+  CabinetTheme,
+  Cart,
+  CartItem,
+  DeliveryMethod,
   MerchantOrder,
   Order,
+  OrderStatus,
   PaymentMethod,
   PaymentOptions,
 } from './types';
@@ -146,6 +152,7 @@ export function productParams({ filter = {}, ids, cursor, limit = PAGE_SIZE }: P
   // The API takes money in minor units (tyiyn); the filter holds whole soms.
   if (filter.minPrice) params.set('price_min_minor', String(filter.minPrice * 100));
   if (filter.maxPrice != null) params.set('price_max_minor', String(filter.maxPrice * 100));
+  if (filter.height != null) params.set('height_cm', String(filter.height));
   if (filter.inStock) params.set('in_stock', 'true');
   if (filter.sort && filter.sort !== 'default') params.set('sort', filter.sort);
   ids?.forEach((id) => params.append('ids', id));
@@ -158,8 +165,8 @@ export function getProducts(query: ProductQuery = {}, signal?: AbortSignal, loca
   return get<ProductPage>('/products', productParams(query), signal, locale);
 }
 
-export function getProduct(id: string, signal?: AbortSignal) {
-  return get<ProductDetail>(`/products/${encodeURIComponent(id)}`, undefined, signal);
+export function getProduct(id: string, signal?: AbortSignal, locale?: string) {
+  return get<ProductDetail>(`/products/${encodeURIComponent(id)}`, undefined, signal, locale);
 }
 
 export function getStores(
@@ -173,8 +180,8 @@ export function getStores(
   return get<{ items: Store[] }>('/stores', params, signal, locale);
 }
 
-export function getStore(slug: string, signal?: AbortSignal) {
-  return get<Store>(`/stores/${encodeURIComponent(slug)}`, undefined, signal);
+export function getStore(slug: string, signal?: AbortSignal, locale?: string) {
+  return get<Store>(`/stores/${encodeURIComponent(slug)}`, undefined, signal, locale);
 }
 
 // With a store slug the result describes that store's own range.
@@ -235,6 +242,8 @@ export const savePolicy = (storeId: string, policy: PolicyInput) =>
 
 export const getMembers = (storeId: string, signal?: AbortSignal) =>
   get<Member[]>(`/merchant/stores/${storeId}/members`, undefined, signal);
+export const setCabinetTheme = (storeId: string, theme: CabinetTheme) =>
+  send<MerchantStore>('PUT', `/merchant/stores/${storeId}/cabinet-theme`, { theme });
 export function uploadStoreAvatar(storeId: string, file: File) {
   const form = new FormData();
   form.append('file', file);
@@ -242,6 +251,18 @@ export function uploadStoreAvatar(storeId: string, file: File) {
 }
 export const deleteStoreAvatar = (storeId: string) =>
   send<MerchantStore>('DELETE', `/merchant/stores/${storeId}/avatar`);
+export interface TelegramStatus {
+  // False when the site has no bot yet.
+  bot_configured: boolean;
+  connected: boolean;
+  link: string | null;
+}
+export const getStoreTelegram = (storeId: string, signal?: AbortSignal) =>
+  get<TelegramStatus>(`/merchant/stores/${storeId}/telegram`, undefined, signal);
+export const checkStoreTelegram = (storeId: string) =>
+  send<TelegramStatus>('POST', `/merchant/stores/${storeId}/telegram/check`);
+export const disconnectStoreTelegram = (storeId: string) =>
+  send<TelegramStatus>('DELETE', `/merchant/stores/${storeId}/telegram`);
 export const addMember = (storeId: string, email: string) =>
   send<Member>('POST', `/merchant/stores/${storeId}/members`, { email });
 export const removeMember = (storeId: string, userId: string) =>
@@ -284,26 +305,179 @@ export const getStoreAnalytics = (storeId: string, days: number, signal?: AbortS
     signal
   );
 
+export interface ImportResult {
+  created: number;
+  // One entry per product row; `row` counts the header as row 1.
+  rows: { row: number; title: string; errors: string[] }[];
+}
+// With dryRun the file is only checked and nothing is created.
+export function importProducts(storeId: string, file: File, dryRun: boolean) {
+  const form = new FormData();
+  form.append('file', file);
+  return send<ImportResult>(
+    'POST',
+    `/merchant/stores/${storeId}/import?dry_run=${dryRun}`,
+    form
+  );
+}
+
 export function uploadProductImage(productId: string, file: File) {
   const form = new FormData();
   form.append('file', file);
   return send<MerchantProduct>('POST', `/merchant/products/${productId}/images`, form);
 }
+export const setProductImageColor = (productId: string, imageId: string, color: string | null) =>
+  send<MerchantProduct>('PATCH', `/merchant/products/${productId}/images/${imageId}`, { color });
 export const deleteProductImage = (productId: string, imageId: string) =>
   send<MerchantProduct>('DELETE', `/merchant/products/${productId}/images/${imageId}`);
+
+// --- Search by photo ----------------------------------------------------------------
+
+export interface VisualSearchStatus {
+  model_version: string;
+  // True while a colour-only stand-in is used instead of a real image model.
+  placeholder: boolean;
+  indexed_photos: number;
+  pending_photos: number;
+}
+export const getVisualSearchStatus = (signal?: AbortSignal) =>
+  get<VisualSearchStatus>('/search/visual/status', undefined, signal);
+// The picture is sent for this one search and is not kept on the server.
+// The catalog's filters apply first; what passes them is ranked by likeness.
+export function visualSearch(picture: Blob, filter: Partial<FilterState> = {}) {
+  const form = new FormData();
+  form.append('file', picture, 'query.jpg');
+  const params = productParams({ filter, limit: 24 });
+  return send<ProductPage>('POST', `/search/visual?${params}`, form);
+}
+
+// Products that look like the given one; empty until its photos are indexed.
+export const getSimilarProducts = (productId: string, signal?: AbortSignal) =>
+  get<ProductPage>(`/search/similar/${productId}`, new URLSearchParams({ limit: '12' }), signal);
 
 // --- Orders and payment -----------------------------------------------------------
 
 export const getPaymentOptions = (signal?: AbortSignal) =>
   get<PaymentOptions>('/payments/options', undefined, signal);
-export const createOrder = (variantId: string, method: PaymentMethod, phone: string) =>
-  send<Order>('POST', '/orders', { variant_id: variantId, payment_method: method, phone });
+// The cart as it stands now: current prices and what can be bought, grouped by store.
+export const checkCart = (items: CartItem[]) =>
+  send<Cart>('POST', '/cart', {
+    items: items.map((item) => ({ variant_id: item.variantId, quantity: item.quantity })),
+  });
+export const createOrder = (order: {
+  items: CartItem[];
+  method: PaymentMethod;
+  phone: string;
+  delivery: DeliveryMethod;
+  address: string | null;
+}) =>
+  send<Order>('POST', '/orders', {
+    items: order.items.map((item) => ({ variant_id: item.variantId, quantity: item.quantity })),
+    payment_method: order.method,
+    phone: order.phone,
+    delivery_method: order.delivery,
+    address: order.address,
+  });
 export const getOrder = (id: string, signal?: AbortSignal) =>
   get<Order>(`/orders/${id}`, undefined, signal);
 export const getMyOrders = (signal?: AbortSignal) => get<Order[]>('/me/orders', undefined, signal);
 // Stands in for the bank's confirmation while payments run in test mode.
 export const confirmTestPayment = (id: string) => send<Order>('POST', `/orders/${id}/test-pay`);
 export const cancelOrder = (id: string) => send<Order>('POST', `/orders/${id}/cancel`);
+export const advanceOrder = (id: string, status: OrderStatus) =>
+  send<MerchantOrder>('POST', `/merchant/orders/${id}/status`, { status });
+export const refuseOrder = (id: string, reason: string) =>
+  send<MerchantOrder>('POST', `/merchant/orders/${id}/refuse`, { reason });
+// A store's sales book: totals, what sold, every sale, and what is left.
+export interface SalesReport {
+  days: number;
+  summary: {
+    revenue_minor: number;
+    pieces: number;
+    sales: number;
+    average_minor: number;
+    site_revenue_minor: number;
+    site_pieces: number;
+    shop_revenue_minor: number;
+    shop_pieces: number;
+    refunds: number;
+    refunds_minor: number;
+    delivery_orders: number;
+    pickup_orders: number;
+  };
+  by_day: { date: string; revenue_minor: number; pieces: number }[];
+  products: {
+    product_id: string | null;
+    title: string;
+    image_url: string | null;
+    pieces: number;
+    revenue_minor: number;
+    variants: { size_label: string | null; color_name: string | null; pieces: number }[];
+  }[];
+  categories: { key: string; pieces: number; revenue_minor: number }[];
+  sizes: { key: string; pieces: number; revenue_minor: number }[];
+  colors: { key: string; pieces: number; revenue_minor: number }[];
+  lines: {
+    id: string;
+    // Sold through the site, or in the shop itself and written down by the seller.
+    channel: 'site' | 'shop';
+    sold_at: string;
+    order_number: number | null;
+    product_id: string | null;
+    title: string;
+    size_label: string | null;
+    color_name: string | null;
+    quantity: number;
+    price_minor: number;
+    total_minor: number;
+    buyer: string | null;
+    status: string | null;
+    note: string | null;
+  }[];
+  stock: {
+    variant_id: string;
+    product_id: string;
+    title: string;
+    size_label: string | null;
+    color_name: string | null;
+    quantity: number | null;
+    availability: Availability;
+    price_minor: number;
+    sold: number;
+  }[];
+}
+export const getSalesReport = (storeId: string, days: number, signal?: AbortSignal) =>
+  get<SalesReport>(
+    '/merchant/sales',
+    new URLSearchParams({ store_id: storeId, days: String(days) }),
+    signal
+  );
+// The same sales book as a PDF file, made by the server.
+export async function getSalesPdf(storeId: string, days: number): Promise<Blob> {
+  const query = new URLSearchParams({ store_id: storeId, days: String(days) });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/merchant/sales/pdf?${query}`, {
+      cache: 'no-store',
+      credentials: 'include',
+    });
+  } catch {
+    throw new ApiError(0, 'network_error', 'Не удалось связаться с сервером');
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(response.status, body?.code ?? 'error', body?.message ?? 'Ошибка сервера');
+  }
+  return response.blob();
+}
+// One tap: one piece of this size and colour was sold in the shop itself.
+// A counted size goes down by one; an uncounted one is switched off.
+export const markSold = (variantId: string) =>
+  send<{ sale_id: string; product: MerchantProduct }>(
+    'POST',
+    `/merchant/variants/${variantId}/sold`
+  );
+export const removeShopSale = (id: string) => send<void>('DELETE', `/merchant/sales/${id}`);
 export const getStoreOrders = (storeId: string, signal?: AbortSignal) =>
   get<MerchantOrder[]>('/merchant/orders', new URLSearchParams({ store_id: storeId }), signal);
 
@@ -346,6 +520,42 @@ export function getDatabaseTable(
   if (page.query) params.set('q', page.query);
   return get<DatabaseTable>(`/admin/database/tables/${encodeURIComponent(name)}`, params, signal);
 }
+export interface AdminOverview {
+  users: number;
+  stores_active: number;
+  stores_pending: number;
+  products_published: number;
+  products_pending: number;
+  // Over the chosen period.
+  orders: number;
+  turnover_minor: number;
+  refunded: number;
+  days: { day: string; orders: number; turnover_minor: number; new_users: number; new_stores: number }[];
+}
+export const getAdminOverview = (days: number, signal?: AbortSignal) =>
+  get<AdminOverview>('/admin/overview', new URLSearchParams({ days: String(days) }), signal);
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  is_admin: boolean;
+  is_active: boolean;
+  email_verified: boolean;
+  created_at: string;
+  stores: string[];
+  orders: number;
+}
+export function getAdminUsers(
+  page: { query: string; limit: number; offset: number },
+  signal?: AbortSignal
+) {
+  const params = new URLSearchParams({ limit: String(page.limit), offset: String(page.offset) });
+  if (page.query) params.set('q', page.query);
+  return get<{ items: AdminUser[]; total: number }>('/admin/users', params, signal);
+}
+export const changeAdminUser = (id: string, change: { is_active?: boolean; is_admin?: boolean }) =>
+  send<AdminUser>('PATCH', `/admin/users/${id}`, change);
 export const getReports = (signal?: AbortSignal) => get<Report[]>('/admin/reports', undefined, signal);
 export const resolveReport = (id: string, resolution: string) =>
   send<void>('POST', `/admin/reports/${id}/resolve`, { resolution });

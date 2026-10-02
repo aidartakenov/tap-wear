@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, StringConstraints, field_validator, model
 from app.catalog.availability import Confirmation
 from app.catalog.models import Audience, Availability, ProductStatus
 from app.catalog.schemas import CategoryOut, ColorOut
-from app.stores.models import MemberRole, StoreAudience, StoreStatus
+from app.stores.models import CabinetTheme, MemberRole, StoreAudience, StoreStatus
 
 Text100 = Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]
 Text200 = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
@@ -52,6 +52,12 @@ class MerchantStoreOut(StoreIn):
     review_note: str | None
     role: MemberRole
     avatar_url: str | None
+    # Colours of this store's cabinet, chosen by the owner.
+    cabinet_theme: CabinetTheme
+
+
+class CabinetThemeIn(BaseModel):
+    theme: CabinetTheme
 
 
 class MemberIn(BaseModel):
@@ -160,6 +166,11 @@ class MerchantImageOut(BaseModel):
     url: str | None
     color: str | None
     position: int
+
+
+class ImageUpdate(BaseModel):
+    # The colour this photo shows; null for a photo that suits every colour.
+    color: str | None
 
 
 class MerchantProductOut(BaseModel):

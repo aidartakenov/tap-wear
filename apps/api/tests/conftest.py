@@ -31,6 +31,8 @@ os.environ["MINIO_BUCKET_ASSETS"] = "tapwear-test-assets"
 # Every test request comes from one address; limits are switched on only where tested.
 os.environ["RATE_LIMIT_ENABLED"] = "false"
 os.environ["PAYMENT_PROVIDER"] = "test"
+# Tests use the small stand-in, not a downloaded model.
+os.environ["EMBEDDER"] = "app.search.placeholder:PlaceholderEmbedder"
 if not dotenv.get("MINIO_ACCESS_KEY"):
     os.environ.setdefault("MINIO_ACCESS_KEY", "test")
     os.environ.setdefault("MINIO_SECRET_KEY", "test")
@@ -143,7 +145,12 @@ async def prepare_database() -> None:
 
     engine = create_async_engine(test_url, poolclass=NullPool)
     async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.drop_all)
+        # Photo search stores vectors; the type comes from this extension.
+        await connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        # CASCADE also removes constraints left by an older version of the models,
+        # which a plain drop_all would trip over.
+        for table in reversed(Base.metadata.sorted_tables):
+            await connection.execute(text(f'DROP TABLE IF EXISTS "{table.name}" CASCADE'))
         await connection.run_sync(Base.metadata.create_all)
     async with engine.begin() as connection:
         async with AsyncSession(bind=connection) as session:

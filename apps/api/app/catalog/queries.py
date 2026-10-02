@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import Select, and_, distinct, func, or_, select, tuple_
+from sqlalchemy import Integer, Select, and_, case, cast, distinct, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -38,6 +38,8 @@ class ProductFilter:
     store: str | None = None
     city_id: str | None = None
     in_stock: bool = False
+    # The buyer's height in centimetres: only sizes meant for it match.
+    height_cm: int | None = None
     ids: list[uuid.UUID] = field(default_factory=list)
 
 
@@ -52,6 +54,39 @@ def visible_products() -> list[Any]:
 
 def escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+# A stated height is a guide, not a measurement: a few centimetres either way still fit.
+HEIGHT_TOLERANCE_CM = 5
+# Children's sizes are named by height: "116" is for a child up to 116 cm,
+# and the size before it ends 6 cm lower.
+KIDS_SIZE_STEP_CM = 6
+
+
+def fits_height(height_cm: int):
+    """SQL condition: this variant's size is meant for a person of the given height.
+
+    Either the seller stated a height (or a range) for the size, or the size is a
+    children's size named by height. Sizes without either never match.
+    """
+    stated = and_(
+        ProductVariant.height_min_cm - HEIGHT_TOLERANCE_CM <= height_cm,
+        ProductVariant.height_max_cm + HEIGHT_TOLERANCE_CM >= height_cm,
+    )
+    # The label is turned into a number only when it is one; other labels give NULL.
+    label_cm = case(
+        (
+            ProductVariant.size_label.op("~")("^[0-9]{2,3}$"),
+            cast(ProductVariant.size_label, Integer),
+        ),
+        else_=None,
+    )
+    by_label = and_(
+        ProductVariant.size_system == "HEIGHT",
+        label_cm >= height_cm,
+        label_cm - KIDS_SIZE_STEP_CM < height_cm,
+    )
+    return or_(stated, by_label)
 
 
 def matching_variants(filters: ProductFilter) -> Select:
@@ -95,6 +130,8 @@ def matching_variants(filters: ProductFilter) -> Select:
         conditions.append(ProductVariant.color_code == filters.color)
     if filters.in_stock:
         conditions.append(confirmed_in_stock())
+    if filters.height_cm is not None:
+        conditions.append(fits_height(filters.height_cm))
     if filters.price_min_minor is not None:
         conditions.append(EFFECTIVE_PRICE >= filters.price_min_minor)
     if filters.price_max_minor is not None:

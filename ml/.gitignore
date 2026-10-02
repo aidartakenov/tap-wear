@@ -1,0 +1,10 @@
+# Environments, photos, exported data and model outputs stay out of the repository.
+.venv/
+data/
+runs/
+*.jpg
+*.jpeg
+*.png
+*.pt
+*.npy
+__pycache__/

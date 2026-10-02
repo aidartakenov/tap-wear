@@ -1,0 +1,4 @@
+# Only needed when EMBEDDER points at a real image model (app.search.hf_embedder).
+# The API runs without these while the colour-only placeholder is used.
+torch==2.14.1
+transformers==5.18.0

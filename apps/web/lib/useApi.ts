@@ -22,7 +22,12 @@ export function useApi<T>(
     const controller = new AbortController();
     setState((previous) => ({ ...previous, error: null, loading: true }));
     request(controller.signal)
-      .then((data) => setState({ data, error: null, loading: false }))
+      .then((data) => {
+        // A response to an earlier request must not replace a newer one, even
+        // when the request itself could not be cancelled.
+        if (controller.signal.aborted) return;
+        setState({ data, error: null, loading: false });
+      })
       .catch((error) => {
         if (controller.signal.aborted) return;
         const apiError =

@@ -12,7 +12,7 @@ import {
   sourceTranslator,
   translator,
 } from './i18n';
-import { CatalogFilters, Me } from './types';
+import { CartItem, CatalogFilters, Me } from './types';
 
 interface AppContextType {
   // Interface language, its translate function and a helper for "5 товаров".
@@ -32,6 +32,12 @@ interface AppContextType {
   signUp: (email: string, password: string, name: string) => Promise<Me>;
   signOut: () => Promise<void>;
   setMe: (me: Me) => void;
+  // What the buyer is about to order. It lives on this device until checkout.
+  cart: CartItem[];
+  cartCount: number;
+  addToCart: (variantId: string, quantity?: number) => void;
+  setCartQuantity: (variantId: string, quantity: number) => void;
+  removeFromCart: (variantIds: string[]) => void;
   // Saved product ids: the account's list when signed in, otherwise this device's list.
   favorites: string[];
   toggleFavorite: (productId: string) => void;
@@ -43,6 +49,9 @@ interface AppContextType {
 }
 
 const FAVORITES_KEY = 'tapwear.favorites';
+const CART_KEY = 'tapwear.cart';
+// The API accepts at most this many pieces of one size and colour.
+const MAX_PER_LINE = 10;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -77,6 +86,53 @@ export function AppProvider({
     document.cookie = `${THEME_COOKIE}=${next ? 'dark' : 'light'}; path=/; max-age=31536000; samesite=lax`;
     setDarkState(next);
   };
+
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartLoaded, setCartLoaded] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CART_KEY) ?? '[]');
+      if (Array.isArray(saved)) {
+        setCart(
+          saved.filter(
+            (item) => typeof item?.variantId === 'string' && Number.isInteger(item?.quantity)
+          )
+        );
+      }
+    } catch {
+      // Unreadable storage: start with an empty cart.
+    }
+    setCartLoaded(true);
+  }, []);
+  useEffect(() => {
+    // Not before the saved cart was read, or it would be overwritten with an empty one.
+    if (!cartLoaded) return;
+    try {
+      localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    } catch {
+      // Private mode: the cart then lasts until the tab is closed.
+    }
+  }, [cart, cartLoaded]);
+
+  const clamp = (quantity: number) => Math.max(1, Math.min(MAX_PER_LINE, quantity));
+  const addToCart = (variantId: string, quantity = 1) =>
+    setCart((current) =>
+      current.some((item) => item.variantId === variantId)
+        ? current.map((item) =>
+            item.variantId === variantId
+              ? { ...item, quantity: clamp(item.quantity + quantity) }
+              : item
+          )
+        : [...current, { variantId, quantity: clamp(quantity) }]
+    );
+  const setCartQuantity = (variantId: string, quantity: number) =>
+    setCart((current) =>
+      current.map((item) =>
+        item.variantId === variantId ? { ...item, quantity: clamp(quantity) } : item
+      )
+    );
+  const removeFromCart = (variantIds: string[]) =>
+    setCart((current) => current.filter((item) => !variantIds.includes(item.variantId)));
 
   const [me, setAccount] = useState<Me | null | undefined>(undefined);
   // A guest's list lives on the device (spec CAT07); an account's list lives on the server.
@@ -187,6 +243,11 @@ export function AppProvider({
         signUp,
         signOut,
         setMe,
+        cart,
+        cartCount: cart.reduce((sum, item) => sum + item.quantity, 0),
+        addToCart,
+        setCartQuantity,
+        removeFromCart,
         favorites,
         toggleFavorite,
         isFavorite: (productId) => favorites.includes(productId),

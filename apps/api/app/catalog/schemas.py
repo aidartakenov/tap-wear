@@ -28,6 +28,8 @@ class VariantOut(BaseModel):
     price_minor: int
     availability: Availability
     availability_confirmed_at: datetime | None
+    # How many pieces are left, when the store counts its stock and few remain.
+    left: int | None
 
 
 class ProductListItem(BaseModel):
@@ -61,6 +63,8 @@ class ProductDetail(ProductListItem):
     sku: str | None
     source_url: str | None
     images: list[str]
+    # For each entry of `images`, the colour code it shows, or null for any colour.
+    image_colors: list[str | None]
     variants: list[VariantOut]
     store: StoreOut
 

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { ALL, sliderMaxSom, sortLabels } from '@/lib/catalog';
+import { useMyHeight, validHeight } from '@/lib/useMyHeight';
 import { useApp } from '@/lib/context';
 import { SortOrder } from '@/lib/types';
 import { useCatalogFilter } from '@/lib/useCatalogFilter';
@@ -75,6 +76,14 @@ export function FilterBar() {
     { value: ALL, label: t('filter.anyColor') },
     ...(catalog?.colors ?? []).map(({ code, name }) => ({ value: code, label: name })),
   ];
+  // The height is remembered, so the product page can suggest a size too.
+  const [myHeight, setMyHeight] = useMyHeight();
+  const applyHeight = (text: string) => {
+    const height = text.trim() === '' ? null : validHeight(text);
+    if (text.trim() !== '' && height === null) return;
+    if (height !== null) setMyHeight(height);
+    if (height !== filter.height) setFilter({ height });
+  };
   const sizeLabels = Array.from(new Set((catalog?.sizes ?? []).map((size) => size.label)));
   const sizeItems: Option[] = [
     { value: ALL, label: t('filter.allSizes') },
@@ -199,7 +208,29 @@ export function FilterBar() {
                 />
               </div>
             </div>
-            <label className="col-span-2 flex items-center gap-2 text-sm text-gray-700 md:self-end md:pb-1.5">
+            <div>
+              <label htmlFor="filter-height" className="text-xs font-medium text-gray-600 mb-1 block">
+                {t('filter.height')}
+              </label>
+              <input
+                id="filter-height"
+                type="number"
+                inputMode="numeric"
+                min={50}
+                max={250}
+                // Remounts when the filter changes elsewhere (a chip removed, a reset).
+                key={filter.height ?? 'none'}
+                defaultValue={filter.height ?? myHeight ?? ''}
+                placeholder="170"
+                title={t('filter.heightHint')}
+                onBlur={(event) => applyHeight(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') applyHeight(event.currentTarget.value);
+                }}
+                className="h-8 w-full rounded-lg border border-gray-300 bg-white px-2.5 text-sm text-gray-900 outline-none focus:border-blue-600"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700 md:self-end md:pb-1.5">
               <input
                 type="checkbox"
                 checked={filter.inStock}

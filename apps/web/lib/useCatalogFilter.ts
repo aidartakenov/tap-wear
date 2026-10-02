@@ -32,7 +32,8 @@ export function useCatalogFilter() {
   const keys = ['query', 'audience', 'category', 'store', 'color', 'size', 'inStock'] as const;
   const activeCount =
     keys.filter((key) => filter[key] !== defaultFilter[key]).length +
-    (filter.minPrice > 0 || filter.maxPrice != null ? 1 : 0);
+    (filter.minPrice > 0 || filter.maxPrice != null ? 1 : 0) +
+    (filter.height != null ? 1 : 0);
 
   return { filter, setFilter, resetFilter, activeCount };
 }

@@ -3,6 +3,7 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { AppProvider } from "@/lib/context";
+import { InstallApp } from "@/components/InstallApp";
 import { SiteHeader } from "@/components/SiteHeader";
 import { cookies } from "next/headers";
 import { getCatalogFilters } from "@/lib/api";
@@ -12,12 +13,22 @@ const inter = Inter({ subsets: ['latin', 'cyrillic'], variable: '--font-sans' })
 
 export function generateMetadata(): Metadata {
   const t = translator(parseLocale(cookies().get(LOCALE_COOKIE)?.value));
-  return { title: t('meta.title'), description: t('meta.description') };
+  return {
+    title: t('meta.title'),
+    description: t('meta.description'),
+    applicationName: 'TapWear',
+    appleWebApp: { capable: true, title: 'TapWear', statusBarStyle: 'default' },
+  };
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  // The colour of the phone's status bar when the site is opened as an app.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b0f17' },
+  ],
 };
 
 export default async function RootLayout({
@@ -36,6 +47,7 @@ export default async function RootLayout({
     <html lang={locale} className={cn("font-sans", inter.variable, dark && "dark")}>
       <body className="antialiased min-w-[360px] bg-gray-50">
         <AppProvider catalog={catalog} locale={locale} dark={dark}>
+          <InstallApp />
           <SiteHeader />
           {children}
         </AppProvider>

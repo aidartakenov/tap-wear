@@ -9,6 +9,9 @@ export type SortOrder = 'default' | 'price_asc' | 'price_desc';
 // Who a store sells for. A store may pick several.
 export type StoreAudience = 'women' | 'men' | 'kids';
 export const STORE_AUDIENCES: StoreAudience[] = ['men', 'women', 'kids'];
+// Colours of a store's cabinet; the owner picks one.
+export type CabinetTheme = 'black' | 'pink' | 'green' | 'blue' | 'orange' | 'rainbow';
+export const CABINET_THEMES: CabinetTheme[] = ['black', 'pink', 'green', 'blue', 'orange', 'rainbow'];
 
 export interface StoreBrief {
   id: string;
@@ -92,6 +95,8 @@ export interface Variant {
   price_minor: number;
   availability: Availability;
   availability_confirmed_at: string | null;
+  // Pieces left, when the store counts its stock and few remain.
+  left: number | null;
 }
 
 export interface ProductDetail extends Omit<Product, 'store'> {
@@ -99,6 +104,8 @@ export interface ProductDetail extends Omit<Product, 'store'> {
   sku: string | null;
   source_url: string | null;
   images: string[];
+  // For each photo, the colour code it shows, or null for any colour.
+  image_colors: (string | null)[];
   variants: Variant[];
   store: Store;
 }
@@ -139,6 +146,8 @@ export interface FilterState {
   minPrice: number;
   maxPrice: number | null;
   size: string;
+  // The buyer's height in centimetres; null when not filtering by it.
+  height: number | null;
   inStock: boolean;
   sort: SortOrder;
 }
@@ -191,6 +200,7 @@ export interface MerchantStore extends StoreInput {
   review_note: string | null;
   role: MemberRole;
   avatar_url: string | null;
+  cabinet_theme: CabinetTheme;
 }
 
 export interface Member {
@@ -318,7 +328,16 @@ export interface StoreAnalytics {
 // --- Orders and payment -------------------------------------------------------
 
 export type PaymentMethod = 'mbank' | 'optima' | 'obank';
-export type OrderStatus = 'pending_payment' | 'paid' | 'cancelled';
+export type OrderStatus =
+  | 'pending_payment'
+  | 'paid'
+  | 'accepted'
+  | 'shipped'
+  | 'completed'
+  | 'cancelled'
+  | 'refunded';
+// The path of a paid order, in order.
+export const ORDER_STEPS: OrderStatus[] = ['paid', 'accepted', 'shipped', 'completed'];
 
 export interface PaymentOptions {
   enabled: boolean;
@@ -327,16 +346,31 @@ export interface PaymentOptions {
   methods: { code: PaymentMethod; name: string }[];
 }
 
-export interface Order {
-  id: string;
-  number: number;
-  status: OrderStatus;
+export type DeliveryMethod = 'pickup' | 'delivery';
+
+export interface OrderItem {
+  product_id: string | null;
   title: string;
   size_label: string | null;
   color_name: string | null;
   image_url: string | null;
+  // Price of one piece.
   price_minor: number;
-  product_id: string | null;
+  quantity: number;
+}
+
+export interface Order {
+  id: string;
+  number: number;
+  status: OrderStatus;
+  items: OrderItem[];
+  items_minor: number;
+  delivery_method: DeliveryMethod;
+  delivery_address: string | null;
+  // null: the store names the delivery price when it contacts the buyer.
+  delivery_fee_minor: number | null;
+  // What is paid online.
+  total_minor: number;
   store_name: string;
   store_slug: string;
   payment_method: PaymentMethod;
@@ -344,6 +378,53 @@ export interface Order {
   test_mode: boolean;
   created_at: string;
   paid_at: string | null;
+  // Why a paid order was called off, if it was.
+  closing_note: string | null;
+  can_cancel: boolean;
+}
+
+// One size and colour of a product in the cart, and how many.
+export interface CartItem {
+  variantId: string;
+  quantity: number;
+}
+
+export interface CartLine {
+  variant_id: string;
+  product_id: string;
+  title: string;
+  size_label: string | null;
+  color_name: string | null;
+  image_url: string | null;
+  price_minor: number;
+  quantity: number;
+  // False when this size and colour cannot be bought now; `problem` is an error code.
+  available: boolean;
+  problem: string | null;
+  // The most that can be bought, when the store counts its stock.
+  max_quantity: number | null;
+}
+
+export interface CartStore {
+  id: string;
+  slug: string;
+  name: string;
+  avatar_url: string | null;
+  pickup_available: boolean;
+  delivery_available: boolean;
+  // null: the store names the delivery price itself. 0: free.
+  delivery_fee_minor: number | null;
+  delivery_areas: string | null;
+  delivery_time: string | null;
+  address: string | null;
+  lines: CartLine[];
+  items_minor: number;
+}
+
+export interface Cart {
+  stores: CartStore[];
+  // Lines that are no longer in the catalog.
+  missing: string[];
 }
 
 export interface MerchantOrder extends Order {

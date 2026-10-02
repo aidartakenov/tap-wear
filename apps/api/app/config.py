@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # confirmation is simulated and no money moves (never allowed in production).
     payment_provider: Literal["none", "test"] = "none"
 
+    # Telegram bot that tells stores about new orders. Without a token messages
+    # are only logged. The username (without @) is used to build the connect link.
+    telegram_bot_token: SecretStr | None = None
+    telegram_bot_username: str | None = None
+
     # Email. "console" writes messages to the log instead of sending them.
     email_backend: Literal["console", "smtp"] = "console"
     email_from: str = "TapWear <no-reply@tapwear.local>"
@@ -82,6 +87,13 @@ class Settings(BaseSettings):
     # IVFFlat indexes support at most 2000 dimensions.
     embedding_model_name: str = "clip-ViT-B-32"
     embedding_dimensions: int = Field(default=512, gt=0, le=2000)
+    # The image model used for photo search, as "module:Class" (see
+    # app/search/embedder.py). The default is a colour-only stand-in, not a model.
+    embedder: str = "app.search.placeholder:PlaceholderEmbedder"
+    # For app.search.hf_embedder:HFEmbedder: the Hugging Face model, and a label
+    # to raise whenever the way pictures are prepared changes.
+    embedder_model: str = "google/siglip-base-patch16-224"
+    embedder_revision: str = "trim-v1"
 
     @model_validator(mode="after")
     def no_simulated_payments_in_production(self):

@@ -19,6 +19,7 @@ import {
   copyProduct,
   createProduct,
   deleteProductImage,
+  setProductImageColor,
   submitProduct,
   updateProduct,
   uploadProductImage,
@@ -53,6 +54,8 @@ interface VariantRow {
   colors: string[];
   availability: Availability;
   price: string;
+  // How many pieces there are, per colour; empty when the store does not count.
+  quantity: string;
 }
 
 interface FormState {
@@ -76,6 +79,7 @@ const newRow = (): VariantRow => ({
   colors: [],
   availability: 'in_stock',
   price: '',
+  quantity: '',
 });
 
 // Saved variants that differ only in colour are shown as one row. Colours of a
@@ -85,7 +89,8 @@ function toRows(variants: MerchantProduct['variants']): VariantRow[] {
   for (const variant of variants) {
     const size = variant.size_label ?? '';
     const price = variant.price_override_minor ? minorToInput(variant.price_override_minor) : '';
-    const group = JSON.stringify([size, variant.availability, price]);
+    const quantity = variant.quantity === null ? '' : String(variant.quantity);
+    const group = JSON.stringify([size, variant.availability, price, quantity]);
     const row = rows.get(group) ?? {
       key: variant.id,
       ids: {},
@@ -93,6 +98,7 @@ function toRows(variants: MerchantProduct['variants']): VariantRow[] {
       colors: [],
       availability: variant.availability,
       price,
+      quantity,
     };
     const color = variant.color?.code ?? '';
     row.ids[color] = variant.id;
@@ -162,6 +168,11 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
     new Set(form.variants.map((row) => row.size.trim()).filter(Boolean))
   );
 
+  // The colours of the saved product: a photo can be tied to one of them.
+  const productColors = reference.colors.filter((color) =>
+    product?.variants.some((variant) => variant.color?.code === color.code)
+  );
+
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
   const setRow = (key: string, change: Partial<VariantRow>) =>
@@ -198,6 +209,11 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
         setPriceError(tr('Рост укажите числом в сантиметрах: 160 или 160-170'));
         return null;
       }
+      const counted = row.quantity.trim();
+      if (counted !== '' && !/^\d{1,4}$/.test(counted)) {
+        setPriceError(tr('Количество укажите целым числом, например 3'));
+        return null;
+      }
       const size = withSizes ? row.size.trim() : '';
       // One variant per chosen colour; none chosen means a single variant without colour.
       for (const color of row.colors.length > 0 ? row.colors : ['']) {
@@ -218,7 +234,7 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
           color: color || null,
           price_override_minor: override,
           availability: row.availability,
-          quantity: null,
+          quantity: counted === '' ? null : Number(counted),
           height_min_cm: height ? height[0] : null,
           height_max_cm: height ? height[1] : null,
         });
@@ -365,7 +381,8 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
             <div>
               <h2 className="font-semibold text-gray-900">{tr('Размеры и наличие')}</h2>
               <p className="text-sm text-gray-600">
-                {tr('Одна строка — один размер. Отметьте все цвета, в которых он есть. Если у цветов разное наличие или цена, добавьте для размера ещё одну строку.')}
+                {tr('Одна строка — один размер. Отметьте все цвета, в которых он есть. Если у цветов разное наличие или цена, добавьте для размера ещё одну строку.')}{' '}
+                {tr('Если указать, сколько штук есть, сайт сам снимет вещь с продажи, когда её раскупят.')}
               </p>
             </div>
             <Field label={tr('Система размеров')}>
@@ -386,7 +403,7 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
               {(withSizes ? form.variants : form.variants.slice(0, 1)).map((row) => (
                 <li
                   key={row.key}
-                  className="grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-2 md:grid-cols-[1fr_1fr_1fr_auto]"
+                  className="grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-2 md:grid-cols-[1fr_1fr_1fr_1fr_auto]"
                 >
                   {withSizes && (
                     <input
@@ -402,6 +419,8 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
                   <select
                     className={inputClass}
                     value={row.availability}
+                    // With a piece count the status follows the number.
+                    disabled={row.quantity.trim() !== ''}
                     onChange={(event) =>
                       setRow(row.key, { availability: event.target.value as Availability })
                     }
@@ -411,6 +430,16 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
                     <option value="out_of_stock">{tr('Нет в наличии')}</option>
                     <option value="unknown">{tr('Нужно уточнять')}</option>
                   </select>
+                  <input
+                    className={inputClass}
+                    value={row.quantity}
+                    onChange={(event) => setRow(row.key, { quantity: event.target.value })}
+                    placeholder={tr('Сколько штук')}
+                    title={tr('Необязательно. Если указать, сайт сам снимет вещь с продажи, когда её купят. При нескольких цветах число относится к каждому цвету.')}
+                    aria-label={tr('Сколько штук в наличии')}
+                    inputMode="numeric"
+                    maxLength={4}
+                  />
                   <input
                     className={inputClass}
                     value={row.price}
@@ -552,12 +581,15 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
           <div>
             <h2 className="font-semibold text-gray-900">{tr('Фотографии')}</h2>
             <p className="text-sm text-gray-600">
-              {tr('От 1 до 5 фото, JPEG, PNG или WebP до 10 МБ. Первое фото показывается в каталоге. Загружайте только свои фотографии.')}
+              {tr('От 1 до 5 фото, JPEG, PNG или WebP до 10 МБ. Первое фото показывается в каталоге. Загружайте только свои фотографии.')}{' '}
+              {productColors.length > 1 &&
+                tr('Под фото можно указать цвет: покупатель увидит это фото, когда выберет его.')}
             </p>
           </div>
           <ul className="grid grid-cols-3 gap-2 md:grid-cols-5">
             {product.images.map((image) => (
-              <li key={image.id} className="relative aspect-[3/4] overflow-hidden rounded-lg bg-gray-100">
+              <li key={image.id} className="space-y-1">
+               <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-gray-100">
                 {image.url && <Image src={image.url} alt="" fill sizes="160px" className="object-cover" />}
                 {!locked && (
                   <button
@@ -572,6 +604,29 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+                )}
+               </div>
+                {productColors.length > 1 && (
+                  <select
+                    value={image.color ?? ''}
+                    disabled={locked || busy !== null}
+                    onChange={(event) =>
+                      run('photo', async () =>
+                        setProduct(
+                          await setProductImageColor(product.id, image.id, event.target.value || null)
+                        )
+                      )
+                    }
+                    aria-label={tr('Цвет на фото')}
+                    className="h-8 w-full rounded-md border border-gray-300 bg-white px-1.5 text-xs text-gray-900"
+                  >
+                    <option value="">{tr('Любой цвет')}</option>
+                    {productColors.map((color) => (
+                      <option key={color.code} value={color.code}>
+                        {color.name}
+                      </option>
+                    ))}
+                  </select>
                 )}
               </li>
             ))}

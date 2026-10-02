@@ -3,7 +3,16 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bookmark, Camera, CircleUserRound, Moon, Search, Store, Sun } from 'lucide-react';
+import {
+  Bookmark,
+  Camera,
+  CircleUserRound,
+  Moon,
+  Search,
+  ShoppingCart,
+  Store,
+  Sun,
+} from 'lucide-react';
 import { ActionLink } from '@/components/ActionLink';
 import { hasBottomNavigation } from '@/components/BottomNavigation';
 import { Logo } from '@/components/Logo';
@@ -21,7 +30,7 @@ const desktopLinks: { href: string; label: Key; icon: typeof Search }[] = [
 export function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
-  const { favorites, catalog, me, t, locale, setLocale, dark, setDark } = useApp();
+  const { favorites, catalog, me, t, locale, setLocale, dark, setDark, cartCount } = useApp();
   const audiences = catalog?.audiences ?? [];
   const categories = catalog?.categories ?? [];
   const [query, setQuery] = useState('');
@@ -75,10 +84,28 @@ export function SiteHeader() {
           onClick={() => setDark(!dark)}
           aria-label={t(dark ? 'nav.lightTheme' : 'nav.darkTheme')}
           title={t(dark ? 'nav.lightTheme' : 'nav.darkTheme')}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 text-gray-700 transition-colors hover:bg-gray-100 md:-ml-3"
+          // On phones the switch lives in the profile; the row has room for the cart instead.
+          className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 text-gray-700 transition-colors hover:bg-gray-100 sm:flex md:-ml-3"
         >
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
+
+        <Link
+          href="/cart"
+          aria-label={t('cart.title')}
+          title={t('cart.title')}
+          className={cn(
+            'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 transition-colors hover:bg-gray-100 md:-ml-3',
+            pathname === '/cart' ? 'text-blue-600' : 'text-gray-700'
+          )}
+        >
+          <ShoppingCart className="h-4 w-4" />
+          {cartCount > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {cartCount}
+            </span>
+          )}
+        </Link>
 
         <nav className="hidden md:flex items-center gap-1">
           {desktopLinks.map(({ href, label, icon: Icon }) => (

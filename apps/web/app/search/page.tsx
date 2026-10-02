@@ -4,28 +4,51 @@ import { useState } from 'react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { VisualSearchModal } from '@/components/VisualSearchModal';
 import { ProductCard } from '@/components/ProductCard';
-import { getProducts } from '@/lib/api';
+import { FormError } from '@/components/form';
+import { getVisualSearchStatus, visualSearch } from '@/lib/api';
 import { useApp } from '@/lib/context';
-import { Product } from '@/lib/types';
+import { ALL } from '@/lib/catalog';
+import { FilterState, Product } from '@/lib/types';
+import { useApi } from '@/lib/useApi';
 
 export default function SearchPage() {
-  const { t } = useApp();
+  const { t, catalog } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [searchResults, setSearchResults] = useState<Product[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const { data: status } = useApi((signal) => getVisualSearchStatus(signal), []);
 
-  const handleSearch = () => {
+  // The last picture is kept, so changing a filter searches again without a new upload.
+  const [picture, setPicture] = useState<Blob | null>(null);
+  const [filter, setFilter] = useState<Partial<FilterState>>({});
+
+  const run = async (image: Blob, chosen: Partial<FilterState>) => {
     setIsSearching(true);
-    // Placeholder until the visual search API exists: a random sample of the catalog.
-    getProducts({ limit: 60 })
-      .then((page) => [...page.items].sort(() => Math.random() - 0.5).slice(0, 6))
-      .catch(() => [])
-      .then((results) => {
-        setSearchResults(results);
-        setIsSearching(false);
-        setIsModalOpen(false);
-      });
+    setError(null);
+    try {
+      setSearchResults((await visualSearch(image, chosen)).items);
+    } catch (cause) {
+      setError(cause);
+    } finally {
+      setIsSearching(false);
+    }
   };
+
+  const handleSearch = (image: Blob) => {
+    setIsModalOpen(false);
+    setPicture(image);
+    run(image, filter);
+  };
+
+  const change = (part: Partial<FilterState>) => {
+    const next = { ...filter, ...part };
+    setFilter(next);
+    if (picture) run(picture, next);
+  };
+
+  const select =
+    'h-9 rounded-full border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-600';
 
   return (
     <div className="min-h-screen pb-24 md:pb-32">
@@ -36,7 +59,13 @@ export default function SearchPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-4">
-        {!isSearching && searchResults.length === 0 && (
+        {status?.placeholder && (
+          <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+            {t('photo.placeholder')}
+          </p>
+        )}
+        <FormError error={error} />
+        {!isSearching && searchResults === null && (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">📷</div>
             <h2 className="text-lg font-semibold text-gray-900 mb-2">
@@ -61,7 +90,47 @@ export default function SearchPage() {
           </div>
         )}
 
-        {searchResults.length > 0 && (
+        {picture && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <select
+              value={filter.audience ?? ALL}
+              onChange={(event) => change({ audience: event.target.value })}
+              aria-label={t('filter.audience')}
+              className={select}
+            >
+              <option value={ALL}>{t('audience.all')}</option>
+              {(catalog?.audiences ?? []).map(({ code }) => (
+                <option key={code} value={code}>
+                  {t(`audience.${code}`)}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filter.category ?? ALL}
+              onChange={(event) => change({ category: event.target.value })}
+              aria-label={t('filter.category')}
+              className={select}
+            >
+              <option value={ALL}>{t('filter.allCategories')}</option>
+              {(catalog?.categories ?? []).map((category) => (
+                <option key={category.code} value={category.code}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={filter.inStock ?? false}
+                onChange={(event) => change({ inStock: event.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              {t('filter.inStockOnly')}
+            </label>
+          </div>
+        )}
+
+        {!isSearching && searchResults !== null && (
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -74,6 +143,9 @@ export default function SearchPage() {
                 {t('photo.newSearch')}
               </button>
             </div>
+            {searchResults.length === 0 && (
+              <p className="py-12 text-center text-gray-600">{t('photo.nothing')}</p>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {searchResults.map((product) => (
                 <ProductCard key={product.id} product={product} />

@@ -59,6 +59,9 @@ function appliedChips(
           });
     chips.push({ label, clear: { minPrice: 0, maxPrice: null } });
   }
+  if (filter.height != null) {
+    chips.push({ label: t('catalog.chipHeight', { height: filter.height }), clear: { height: null } });
+  }
   if (filter.inStock) chips.push({ label: t('catalog.chipInStock'), clear: { inStock: false } });
   return chips;
 }

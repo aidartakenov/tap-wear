@@ -5,10 +5,13 @@ import io
 
 import pytest
 from PIL import Image
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app import mailer, storage
 from app.config import get_settings
-from tests.conftest import ADMIN_EMAIL, PASSWORD, SOM, prepare_database
+from tests.conftest import ADMIN_EMAIL, PASSWORD, SOM, prepare_database, test_url
 
 API = "/api/v1"
 COOKIE = get_settings().session_cookie_name
@@ -617,6 +620,51 @@ def test_height_must_be_a_complete_sensible_range(owner, store):
     assert create(height_min_cm=170, height_max_cm=180) == 201
 
 
+def test_catalog_can_be_filtered_by_the_buyers_height(client, owner, admin, store):
+    product = new_product(
+        owner,
+        store["id"],
+        title="Плащ по росту",
+        variants=[
+            {"size_system": "INT", "size_label": "S", "height_min_cm": 160, "height_max_cm": 168},
+            {"size_system": "INT", "size_label": "L", "height_min_cm": 180, "height_max_cm": 180},
+        ],
+    )
+    kids = new_product(
+        owner,
+        store["id"],
+        title="Комбинезон детский",
+        audience="kids",
+        variants=[{"size_system": "HEIGHT", "size_label": "116"}],
+    )
+
+    async def publish() -> None:
+        engine = create_async_engine(test_url, poolclass=NullPool)
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("UPDATE products SET status = 'published' WHERE id = ANY(:ids)"),
+                {"ids": [product["id"], kids["id"]]},
+            )
+            await connection.execute(
+                text("UPDATE stores SET status = 'active' WHERE id = :id"), {"id": store["id"]}
+            )
+        await engine.dispose()
+
+    asyncio.run(publish())
+
+    def found(height: int) -> set[str]:
+        client.cookies.clear()
+        items = client.get(f"{API}/products", params={"height_cm": height}).json()["items"]
+        return {item["title"] for item in items}
+
+    assert found(165) == {"Плащ по росту"}
+    # A single stated height fits a few centimetres either way, and no further.
+    assert found(184) == {"Плащ по росту"} and found(174) == set()
+    # A children's size named by height fits up to that height.
+    assert found(114) == {"Комбинезон детский"} and found(117) == set()
+    assert client.get(f"{API}/products", params={"height_cm": 20}).status_code == 422
+
+
 # --- Store avatar -----------------------------------------------------------
 
 
@@ -711,3 +759,103 @@ def test_database_view_is_read_only_for_admins_and_hides_secrets(owner, admin):
     by_secret = admin.get("/admin/database/tables/users", params={"sort": "password_hash"})
     assert by_secret.status_code == 422
     assert admin.post("/admin/database/tables/users", json={}).status_code == 405
+
+
+# --- Many products from a spreadsheet --------------------------------------------
+
+
+def import_file(actor: Actor, store_id: str, text: str, encoding: str = "utf-8-sig", **params):
+    return actor.post(
+        f"/merchant/stores/{store_id}/import",
+        params=params,
+        files={"file": ("products.csv", text.encode(encoding), "text/csv")},
+    )
+
+
+GOOD_FILE = """Название;Категория;Для кого;Цена;Бренд;Размеры;Цвета;Количество
+Рубашка из таблицы;Куртки;мужчинам;3 200;Sample;M, L;Черный, Белый;2
+Шапка из таблицы;jackets;унисекс;900,50;;;;
+"""
+
+
+def test_products_are_created_from_a_spreadsheet_as_drafts(owner, stranger, store):
+    assert import_file(stranger, store["id"], GOOD_FILE).status_code == 404
+
+    checked = import_file(owner, store["id"], GOOD_FILE, dry_run=True).json()
+    assert checked["created"] == 0 and all(not row["errors"] for row in checked["rows"])
+    before = len(owner.get("/merchant/products", params={"store_id": store["id"]}).json()["items"])
+
+    # Excel in Russian saves in the Windows encoding; that works too.
+    done = import_file(owner, store["id"], GOOD_FILE, encoding="cp1251").json()
+    assert done["created"] == 2
+    products = owner.get("/merchant/products", params={"store_id": store["id"]}).json()["items"]
+    assert len(products) == before + 2
+    shirt = next(item for item in products if item["title"] == "Рубашка из таблицы")
+    assert shirt["status"] == "draft" and shirt["base_price_minor"] == 3200 * SOM
+    # Two sizes in two colours make four variants, each counted.
+    assert len(shirt["variants"]) == 4
+    assert {variant["quantity"] for variant in shirt["variants"]} == {2}
+    hat = next(item for item in products if item["title"] == "Шапка из таблицы")
+    assert hat["base_price_minor"] == 90050 and len(hat["variants"]) == 1
+
+
+def test_a_spreadsheet_with_a_bad_row_creates_nothing(owner, store):
+    bad = """Название,Категория,Для кого,Цена,Цвета
+Хорошая вещь,Куртки,женщинам,1000,Черный
+Плохая вещь,Нет такой,всем,дорого,Серобуромалиновый
+"""
+    before = len(owner.get("/merchant/products", params={"store_id": store["id"]}).json()["items"])
+    result = import_file(owner, store["id"], bad).json()
+
+    assert result["created"] == 0
+    assert result["rows"][0]["errors"] == [] and len(result["rows"][1]["errors"]) == 4
+    assert result["rows"][1]["row"] == 3
+    after = len(owner.get("/merchant/products", params={"store_id": store["id"]}).json()["items"])
+    assert after == before
+
+    no_price = import_file(owner, store["id"], "Название;Категория;Для кого\nВещь;Куртки;детям\n")
+    assert no_price.json()["code"] == "missing_columns"
+    assert import_file(owner, store["id"], "").json()["code"] == "empty_file"
+
+
+# --- Photo colours (approves the store, so it runs last) -------------------------
+
+
+def test_photo_can_be_tied_to_a_colour_and_buyers_get_it(
+    client, owner, admin, store, object_storage
+):
+    product = new_product(owner, store["id"], title="Цветная вещь")
+    uploaded = upload(owner, product["id"], photo()).json()
+    image_id = uploaded["images"][0]["id"]
+    path = f"/merchant/products/{product['id']}/images/{image_id}"
+
+    assert owner.patch(path, json={"color": "no-such-colour"}).status_code == 422
+    assert owner.patch(path, json={"color": "black"}).json()["images"][0]["color"] == "black"
+
+    owner.post(f"/merchant/products/{product['id']}/submit")
+    admin.post(f"/admin/products/{product['id']}/decision", json={"decision": "approve"})
+    admin.post(f"/admin/stores/{store['id']}/decision", json={"decision": "approve"})
+    client.cookies.clear()
+    public = client.get(f"{API}/products/{product['id']}").json()
+    assert public["image_colors"] == ["black"] and len(public["images"]) == 1
+
+    assert owner.patch(path, json={"color": None}).json()["images"][0]["color"] is None
+
+
+def test_owner_picks_the_colours_of_the_cabinet(client, owner, store):
+    theme = f"/merchant/stores/{store['id']}/cabinet-theme"
+    # Black until the owner chooses.
+    assert owner.get("/merchant/stores").json()[0]["cabinet_theme"] == "black"
+
+    saved = owner.request("PUT", theme, json={"theme": "rainbow"})
+    assert saved.status_code == 200 and saved.json()["cabinet_theme"] == "rainbow"
+    assert owner.request("PUT", theme, json={"theme": "glitter"}).status_code == 422
+
+    # Saving the store's profile does not touch the colours.
+    profile = {"name": "Переименовано", "city_code": "bishkek", "audiences": ["men"]}
+    assert owner.patch(f"/merchant/stores/{store['id']}", json=profile).status_code == 200
+    assert owner.get("/merchant/stores").json()[0]["cabinet_theme"] == "rainbow"
+
+    # Someone outside the store cannot change them.
+    outsider = Actor(client, "theme-outsider@shop.test")
+    assert outsider.request("PUT", theme, json={"theme": "pink"}).status_code == 404

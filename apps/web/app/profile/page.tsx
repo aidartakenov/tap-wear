@@ -3,7 +3,7 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Bookmark, ChevronRight, LogOut, Shield, ShoppingBag, Store, User } from 'lucide-react';
+import { Bookmark, ChevronRight, LogOut, Moon, Shield, ShoppingBag, Store, Sun, User } from 'lucide-react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { Loading } from '@/components/PageState';
 import { VerifyEmailNotice } from '@/components/VerifyEmailNotice';
@@ -141,7 +141,7 @@ function AccountSettings({ me }: { me: Me }) {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { me, signOut, favorites, t, count } = useApp();
+  const { me, signOut, favorites, t, count, dark, setDark } = useApp();
 
   return (
     <div className="min-h-screen pb-24 md:pb-32">
@@ -181,6 +181,20 @@ export default function ProfilePage() {
             </section>
 
             <VerifyEmailNotice />
+
+            <button
+              onClick={() => setDark(!dark)}
+              className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-left hover:shadow-md transition-shadow"
+            >
+              {dark ? (
+                <Sun className="h-5 w-5 shrink-0 text-gray-500" />
+              ) : (
+                <Moon className="h-5 w-5 shrink-0 text-gray-500" />
+              )}
+              <span className="font-medium text-gray-900">
+                {t(dark ? 'nav.lightTheme' : 'nav.darkTheme')}
+              </span>
+            </button>
 
             <Row
               href="/favorites"

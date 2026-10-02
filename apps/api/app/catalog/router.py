@@ -90,6 +90,16 @@ def list_item_fields(product: Product, price_minor: int, price_varies: bool) -> 
     }
 
 
+# Exact numbers are shown to buyers only when stock is running low.
+FEW_LEFT = 5
+
+
+def few_left(variant) -> int | None:
+    if variant.stock_mode != "exact" or variant.quantity is None:
+        return None
+    return variant.quantity if 0 < variant.quantity <= FEW_LEFT else None
+
+
 def product_filter(
     q: Annotated[str | None, Query(max_length=100, description="Words to search for")] = None,
     category: str | None = None,
@@ -103,6 +113,7 @@ def product_filter(
     store: Annotated[str | None, Query(description="Store slug")] = None,
     city_id: str | None = None,
     in_stock: bool = False,
+    height_cm: Annotated[int | None, Query(ge=50, le=250)] = None,
     ids: Annotated[list[uuid.UUID] | None, Query(max_length=100)] = None,
 ) -> ProductFilter:
     return ProductFilter(
@@ -118,6 +129,7 @@ def product_filter(
         store=store,
         city_id=city_id,
         in_stock=in_stock,
+        height_cm=height_cm,
         ids=ids or [],
     )
 
@@ -155,6 +167,7 @@ async def get_product_detail(
         sku=product.sku,
         source_url=product.source_url,
         images=[url for image in product.images if (url := image_url(image))],
+        image_colors=[image.color_code for image in product.images if image_url(image)],
         variants=[
             VariantOut(
                 id=variant.id,
@@ -170,6 +183,7 @@ async def get_product_detail(
                 price_minor=variant.price_override_minor or product.base_price_minor,
                 availability=effective_availability(variant),
                 availability_confirmed_at=variant.availability_confirmed_at,
+                left=few_left(variant),
             )
             for variant in product.variants
         ],

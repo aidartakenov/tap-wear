@@ -16,7 +16,8 @@ import { useApp } from '@/lib/context';
 interface VisualSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSearch: () => void;
+  // Called with the picture to search by: the selected area, or the whole photo.
+  onSearch: (picture: Blob) => void;
 }
 
 export function VisualSearchModal({
@@ -28,11 +29,14 @@ export function VisualSearchModal({
   const [imageSrc, setImageSrc] = useState<string>('');
   const [crop, setCrop] = useState<Crop>();
   const [isUploading, setIsUploading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setFile(file);
       setIsUploading(true);
       const reader = new FileReader();
       reader.onload = () => {
@@ -46,6 +50,7 @@ export function VisualSearchModal({
 
   const handleReset = () => {
     setImageSrc('');
+    setFile(null);
     setCrop(undefined);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -53,9 +58,34 @@ export function VisualSearchModal({
   };
 
   const handleSearch = () => {
-    if (imageSrc) {
-      onSearch();
+    const image = imageRef.current;
+    if (!file) return;
+    // No area selected (or a stray click): search by the whole photo.
+    if (!crop || !image || crop.width < 5 || crop.height < 5) {
+      onSearch(file);
+      return;
     }
+    // The selection is in percent of the shown picture; cut the same part out
+    // of the original at full resolution.
+    const canvas = document.createElement('canvas');
+    const width = Math.round((crop.width / 100) * image.naturalWidth);
+    const height = Math.round((crop.height / 100) * image.naturalHeight);
+    canvas.width = width;
+    canvas.height = height;
+    canvas
+      .getContext('2d')
+      ?.drawImage(
+        image,
+        (crop.x / 100) * image.naturalWidth,
+        (crop.y / 100) * image.naturalHeight,
+        width,
+        height,
+        0,
+        0,
+        width,
+        height
+      );
+    canvas.toBlob((blob) => onSearch(blob ?? file), 'image/jpeg', 0.9);
   };
 
   return (
@@ -71,7 +101,7 @@ export function VisualSearchModal({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png"
+                accept="image/jpeg,image/png,image/webp,image/avif"
                 onChange={handleFileSelect}
                 className="hidden"
                 id="image-upload"
@@ -105,6 +135,7 @@ export function VisualSearchModal({
                   className="max-h-[400px] mx-auto"
                 >
                   <img
+                    ref={imageRef}
                     src={imageSrc}
                     alt="Uploaded"
                     className="max-w-full h-auto"
@@ -119,7 +150,6 @@ export function VisualSearchModal({
               <Button
                 onClick={handleSearch}
                 className="w-full"
-                disabled={!crop}
               >
                 <Search className="w-4 h-4 mr-2" />
                 {t('photo.find')}

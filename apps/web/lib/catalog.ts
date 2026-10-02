@@ -59,6 +59,7 @@ export const defaultFilter: FilterState = {
   minPrice: 0,
   maxPrice: null,
   size: '',
+  height: null,
   inStock: false,
   sort: 'default',
 };
@@ -114,6 +115,7 @@ export function filterFromParams(params: URLSearchParams): FilterState {
     minPrice: number('price_min') ?? 0,
     maxPrice: number('price_max'),
     size: params.get('size') ?? '',
+    height: number('height'),
     inStock: params.get('in_stock') === '1',
     sort: sort && sort in sortLabels ? sort : 'default',
   };
@@ -130,6 +132,7 @@ export function filterToQuery(filter: Partial<FilterState>): string {
   if (full.minPrice > 0) params.set('price_min', String(full.minPrice));
   if (full.maxPrice != null) params.set('price_max', String(full.maxPrice));
   if (full.size) params.set('size', full.size);
+  if (full.height != null) params.set('height', String(full.height));
   if (full.inStock) params.set('in_stock', '1');
   if (full.sort !== 'default') params.set('sort', full.sort);
   return params.toString();
@@ -180,7 +183,11 @@ export const statusColors: Record<string, string> = {
   rejected: 'bg-red-100 text-red-800',
   blocked: 'bg-red-100 text-red-800',
   pending_payment: 'bg-amber-100 text-amber-800',
-  paid: 'bg-green-100 text-green-800',
+  paid: 'bg-amber-100 text-amber-800',
+  accepted: 'bg-blue-50 text-blue-900',
+  shipped: 'bg-blue-50 text-blue-900',
+  completed: 'bg-green-100 text-green-800',
+  refunded: 'bg-red-100 text-red-800',
   cancelled: 'bg-gray-100 text-gray-500',
 };
 

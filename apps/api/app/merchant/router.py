@@ -1,14 +1,16 @@
 import re
+import secrets
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, UploadFile
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import storage
+from app import storage, telegram
 from app.accounts.deps import CurrentUser
 from app.accounts.models import User
 from app.catalog.availability import Confirmation, confirmation_state, set_availability
@@ -35,6 +37,8 @@ from app.merchant.access import (
     variant_for,
 )
 from app.merchant.schemas import (
+    CabinetThemeIn,
+    ImageUpdate,
     MemberIn,
     MemberOut,
     MerchantImageOut,
@@ -100,6 +104,7 @@ def store_out(store: Store, role: str) -> MerchantStoreOut:
         review_note=store.review_note,
         role=role,
         avatar_url=storage.avatar_url(store.avatar_key),
+        cabinet_theme=store.cabinet_theme,
         name=store.name,
         description=store.description,
         city_code=store.city_code,
@@ -243,6 +248,18 @@ async def editable_store(db: AsyncSession, user: User, store_id: uuid.UUID) -> S
     return store
 
 
+@router.put("/stores/{store_id}/cabinet-theme")
+async def set_cabinet_theme(
+    store_id: uuid.UUID, body: CabinetThemeIn, user: CurrentUser, db: Db
+) -> MerchantStoreOut:
+    """The owner picks the colours of the store's cabinet; staff see them too."""
+    store = await editable_store(db, user, store_id)
+    store.cabinet_theme = body.theme
+    await db.commit()
+    await db.refresh(store)
+    return store_out(store, MemberRole.OWNER)
+
+
 @router.put(
     "/stores/{store_id}/avatar",
     dependencies=[Depends(rate_limit("uploads", limit=30))],
@@ -270,6 +287,61 @@ async def delete_avatar(store_id: uuid.UUID, user: CurrentUser, db: Db) -> Merch
     if previous:
         await storage.remove_object(previous)
     return store_out(store, MemberRole.OWNER)
+
+
+class TelegramStatus(BaseModel):
+    # False when the site has no bot yet: notices are then only written to the log.
+    bot_configured: bool
+    connected: bool
+    # Where the owner starts the bot; null when no bot is configured.
+    link: str | None
+
+
+def telegram_status(store: Store) -> TelegramStatus:
+    return TelegramStatus(
+        bot_configured=telegram.configured(),
+        connected=store.telegram_chat_id is not None,
+        link=telegram.link(store.telegram_code) if store.telegram_code else None,
+    )
+
+
+@router.get("/stores/{store_id}/telegram")
+async def get_telegram(store_id: uuid.UUID, user: CurrentUser, db: Db) -> TelegramStatus:
+    store = await editable_store(db, user, store_id)
+    if store.telegram_code is None:
+        # A code only this store knows, so nobody else can attach their chat to it.
+        store.telegram_code = secrets.token_urlsafe(12)
+        await db.commit()
+    return telegram_status(store)
+
+
+@router.post("/stores/{store_id}/telegram/check")
+async def check_telegram(store_id: uuid.UUID, user: CurrentUser, db: Db) -> TelegramStatus:
+    """Look for the owner's "Start" in the bot and remember the chat it came from."""
+    store = await editable_store(db, user, store_id)
+    if store.telegram_code is None:
+        raise ApiError(409, "telegram_not_started", "Open the bot link first")
+    chat_id = await telegram.chat_that_sent(store.telegram_code)
+    if chat_id is None:
+        raise ApiError(
+            409, "telegram_not_started", "The bot has not been started with this link yet"
+        )
+    store.telegram_chat_id = chat_id
+    await db.commit()
+    await telegram.send(
+        chat_id, f"TapWear: магазин «{store.name}» подключён. Сюда будут приходить новые заказы."
+    )
+    return telegram_status(store)
+
+
+@router.delete("/stores/{store_id}/telegram")
+async def disconnect_telegram(store_id: uuid.UUID, user: CurrentUser, db: Db) -> TelegramStatus:
+    store = await editable_store(db, user, store_id)
+    store.telegram_chat_id = None
+    # A new code, so the old link stops working.
+    store.telegram_code = secrets.token_urlsafe(12)
+    await db.commit()
+    return telegram_status(store)
 
 
 @router.get("/stores/{store_id}/members")
@@ -508,6 +580,22 @@ async def upload_image(
             position=max((item.position for item in product.images), default=-1) + 1,
         )
     )
+    product.version += 1
+    return await commit_product(db, product.id)
+
+
+@router.patch("/products/{product_id}/images/{image_id}")
+async def update_image(
+    product_id: uuid.UUID, image_id: uuid.UUID, body: ImageUpdate, user: CurrentUser, db: Db
+) -> MerchantProductOut:
+    """Say which colour a photo shows, so buyers see it when they pick that colour."""
+    product = await product_for(db, user, product_id, lock=True)
+    ensure_editable(product)
+    image = next((item for item in product.images if item.id == image_id), None)
+    if image is None:
+        raise not_found("Photo not found")
+    await check_reference(db, Color, body.color or None, "colour")
+    image.color_code = body.color or None
     product.version += 1
     return await commit_product(db, product.id)
 

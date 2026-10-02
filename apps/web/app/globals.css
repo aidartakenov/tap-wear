@@ -195,3 +195,75 @@
 .dark :is(.border-amber-200, .border-red-200, .border-blue-200) {
   border-color: rgb(255 255 255 / 0.12);
 }
+
+/* A store cabinet's own colours (the seller's pages of one store). The owner
+   picks one of six; "black" is the plain look. A theme paints the banner and
+   repaints what is dark ink or the blue accent inside the cabinet: the main
+   buttons, chosen chips, the current tab and links. */
+.cabinet-theme {
+  --cabinet-banner: linear-gradient(135deg, rgb(17 24 39), rgb(55 65 81));
+}
+.dark .cabinet-theme {
+  --cabinet-banner: linear-gradient(135deg, rgb(30 38 54), rgb(55 65 81));
+}
+.cabinet-theme-pink {
+  --cabinet-accent: 219 39 119;
+  --cabinet-deep: 190 24 93;
+  --cabinet-ink: 219 39 119;
+  --cabinet-banner: linear-gradient(135deg, rgb(190 24 93), rgb(244 114 182));
+}
+.cabinet-theme-green {
+  --cabinet-accent: 21 128 61;
+  --cabinet-deep: 22 101 52;
+  --cabinet-ink: 21 128 61;
+  --cabinet-banner: linear-gradient(135deg, rgb(22 101 52), rgb(34 197 94));
+}
+.cabinet-theme-blue {
+  --cabinet-accent: 37 99 235;
+  --cabinet-deep: 29 78 216;
+  --cabinet-ink: 37 99 235;
+  --cabinet-banner: linear-gradient(135deg, rgb(30 64 175), rgb(59 130 246));
+}
+.cabinet-theme-orange {
+  --cabinet-accent: 234 88 12;
+  --cabinet-deep: 194 65 12;
+  --cabinet-ink: 234 88 12;
+  --cabinet-banner: linear-gradient(135deg, rgb(194 65 12), rgb(251 146 60));
+}
+.cabinet-theme-rainbow {
+  --cabinet-accent: 124 58 237;
+  --cabinet-deep: 109 40 217;
+  --cabinet-ink: 124 58 237;
+  --cabinet-rainbow: linear-gradient(
+    90deg,
+    rgb(219 39 119),
+    rgb(234 88 12),
+    rgb(202 138 4),
+    rgb(22 163 74),
+    rgb(37 99 235),
+    rgb(124 58 237)
+  );
+  --cabinet-banner: var(--cabinet-rainbow);
+}
+.dark .cabinet-theme-pink { --cabinet-ink: 244 114 182; }
+.dark .cabinet-theme-green { --cabinet-ink: 74 222 128; }
+.dark .cabinet-theme-blue { --cabinet-ink: 96 165 250; }
+.dark .cabinet-theme-orange { --cabinet-ink: 251 146 60; }
+.dark .cabinet-theme-rainbow { --cabinet-ink: 167 139 250; }
+
+.cabinet-banner { background: var(--cabinet-banner); }
+
+.cabinet-theme:not(.cabinet-theme-black) {
+  --bg-gray-900: var(--cabinet-accent);
+  --bg-black: var(--cabinet-deep);
+  --border-gray-900: var(--cabinet-accent);
+}
+.cabinet-theme:not(.cabinet-theme-black) .text-blue-600 { color: rgb(var(--cabinet-ink)); }
+.cabinet-theme:not(.cabinet-theme-black) .border-blue-600,
+.cabinet-theme:not(.cabinet-theme-black) .focus\:border-blue-600:focus {
+  border-color: rgb(var(--cabinet-ink));
+}
+.cabinet-theme:not(.cabinet-theme-black) .bg-blue-600 { background-color: rgb(var(--cabinet-accent)); }
+/* Rainbow: the main buttons, chosen chips and the current tab carry all the colours. */
+.cabinet-theme-rainbow .bg-gray-900 { background-image: var(--cabinet-rainbow); }
+.cabinet-theme-rainbow .border-b-2.border-blue-600 { border-image: var(--cabinet-rainbow) 1; }

@@ -172,6 +172,15 @@ async def seed(path: Path | None) -> None:
         store_ids = {}
         for item in catalog["stores"]:
             store_ids[item["id"]] = demo_uuid("store", item["id"])
+            # Whoever the store's products are for.
+            audiences = [
+                audience
+                for audience in StoreAudience
+                if any(
+                    p["storeId"] == item["id"] and p["audience"] == audience
+                    for p in catalog["products"]
+                )
+            ]
             store = await session.merge(
                 Store(
                     id=store_ids[item["id"]],
@@ -179,15 +188,7 @@ async def seed(path: Path | None) -> None:
                     name=item["name"],
                     description=item["description"],
                     city_code=CITIES[item["city"]],
-                    # Whoever the store's products are for.
-                    audiences=[
-                        audience
-                        for audience in StoreAudience
-                        if any(
-                            p["storeId"] == item["id"] and p["audience"] == audience
-                            for p in catalog["products"]
-                        )
-                    ],
+                    audiences=audiences,
                     address=item["address"],
                     working_hours=item["workingHours"],
                     phone=item["phone"],

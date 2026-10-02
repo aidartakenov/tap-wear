@@ -54,6 +54,23 @@ services:
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
 
+  # Computes photo search vectors for new or changed product photos.
+  indexer:
+    build: ../apps/api
+    restart: unless-stopped
+    command: ["python", "-m", "app.search.indexer", "--watch"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+
   web:
     build:
       context: ../apps/web
@@ -65,6 +82,8 @@ services:
     environment:
       # Pages rendered on the server call the API inside the private network.
       API_INTERNAL_URL: http://api:8000/api/v1
+      # The public address, for links in the sitemap and in link previews.
+      SITE_URL: ${SITE_URL}
 
   caddy:
     image: caddy:2

@@ -3,23 +3,26 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Bookmark, ChevronRight, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Bookmark, ChevronRight, ShoppingBag, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CheckoutSheet } from '@/components/CheckoutSheet';
 import { ContactButton } from '@/components/ContactButton';
 import { DemoNotice } from '@/components/DemoNotice';
+import { FormError } from '@/components/form';
 import { ErrorState, Loading } from '@/components/PageState';
+import { ProductShelf } from '@/components/ProductShelf';
 import { ReportProblem } from '@/components/ReportProblem';
 import { StoreAvatar } from '@/components/StoreAvatar';
 import { StoreConditions } from '@/components/StoreConditions';
 import { track } from '@/lib/analytics';
-import { getPaymentOptions, getProduct } from '@/lib/api';
-import { colorSwatches, formatHeight, formatPrice } from '@/lib/catalog';
+import { checkCart, getPaymentOptions, getProduct, getSimilarProducts } from '@/lib/api';
+import { catalogHref, colorSwatches, formatHeight, formatPrice } from '@/lib/catalog';
 import { Locale, optionalKey } from '@/lib/i18n';
 import { useApp } from '@/lib/context';
-import { ProductDetail, Variant } from '@/lib/types';
+import { CartStore, ProductDetail, Variant } from '@/lib/types';
 import { useApi } from '@/lib/useApi';
+import { sizeFitsHeight, useMyHeight, validHeight } from '@/lib/useMyHeight';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,12 +66,33 @@ function ProductView({ product }: { product: ProductDetail }) {
       : complete
         ? product.variants.find((variant) => fits(variant, size, color))
         : undefined;
-  const { t, locale } = useApp();
+  const { t, locale, cart, addToCart } = useApp();
   // Buying is offered when online payment is on and the product is a real offer.
   const { data: payments } = useApi((signal) => getPaymentOptions(signal), []);
   const canBuy = !!payments?.enabled && !store.is_demo;
-  const [checkout, setCheckout] = useState(false);
+  // "Buy now" is a checkout for this one item, without going through the cart.
+  const [checkout, setCheckout] = useState<CartStore | null>(null);
+  const [opening, setOpening] = useState(false);
   const [buyHint, setBuyHint] = useState(false);
+  const [buyError, setBuyError] = useState<unknown>(null);
+  const inCart = !!selected && cart.some((item) => item.variantId === selected.id);
+  const buyNow = async () => {
+    if (!selected) {
+      setBuyHint(true);
+      return;
+    }
+    setOpening(true);
+    setBuyError(null);
+    try {
+      // The server says how this store hands goods over and what it costs.
+      const checked = await checkCart([{ variantId: selected.id, quantity: 1 }]);
+      setCheckout(checked.stores[0] ?? null);
+    } catch (cause) {
+      setBuyError(cause);
+    } finally {
+      setOpening(false);
+    }
+  };
   const systemKey = optionalKey(`sizeSystem.${product.size_system}`);
   const sizeSystem = systemKey ? t(systemKey) : product.size_system;
 
@@ -76,7 +100,25 @@ function ProductView({ product }: { product: ProductDetail }) {
   useEffect(() => {
     track('product_view', { product_id: product.id });
   }, [product.id]);
+  // Photos of the chosen colour come first; the rest follow in their own order.
+  const shows = (index: number) => color !== null && product.image_colors[index] === color;
+  const gallery = [
+    ...product.images.filter((_, index) => shows(index)),
+    ...product.images.filter((_, index) => !shows(index)),
+  ];
   const availability = selected?.availability ?? product.availability;
+  // Sizes meant for the buyer's height, by what the seller stated.
+  const [myHeight, setMyHeight] = useMyHeight();
+  const fitting =
+    myHeight === null
+      ? []
+      : Array.from(
+          new Set(
+            sized
+              .filter((variant) => sizeFitsHeight(myHeight, variant))
+              .map((variant) => variant.size_label!)
+          )
+        );
   // Size -> height, where the seller stated one. Several colours share a size, so each size is listed once.
   const heights = Array.from(
     new Map(
@@ -92,8 +134,12 @@ function ProductView({ product }: { product: ProductDetail }) {
   return (
     <main className="mx-auto max-w-6xl bg-white md:my-6 md:grid md:grid-cols-2 md:gap-8 md:rounded-2xl md:border md:border-gray-200 md:p-6 md:items-start">
       <div className="md:sticky md:top-20">
-        <div className="flex overflow-x-auto snap-x snap-mandatory bg-gray-100 md:rounded-xl">
-          {product.images.map((image, index) => (
+        {/* The key puts the gallery back to its first photo when the colour changes. */}
+        <div
+          key={color ?? 'all'}
+          className="flex overflow-x-auto snap-x snap-mandatory bg-gray-100 md:rounded-xl"
+        >
+          {gallery.map((image, index) => (
             <div key={image} className="relative aspect-[3/4] w-full shrink-0 snap-center">
               <Image
                 src={image}
@@ -137,6 +183,11 @@ function ProductView({ product }: { product: ProductDetail }) {
                 date: formatConfirmed(selected.availability_confirmed_at, locale),
               })}`}
           </p>
+          {selected?.left != null && (
+            <p className="mt-1 text-sm font-medium text-amber-800">
+              {t('product.left', { n: selected.left })}
+            </p>
+          )}
         </div>
 
         <Separator />
@@ -221,6 +272,35 @@ function ProductView({ product }: { product: ProductDetail }) {
                   })}
                 </p>
               )}
+              {(heights.length > 0 || product.size_system === 'HEIGHT') && (
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                  <label htmlFor="my-height" className="text-gray-600">
+                    {t('product.myHeight')}
+                  </label>
+                  <input
+                    id="my-height"
+                    type="number"
+                    inputMode="numeric"
+                    min={50}
+                    max={250}
+                    key={myHeight ?? 'none'}
+                    defaultValue={myHeight ?? ''}
+                    placeholder="170"
+                    onBlur={(event) => setMyHeight(validHeight(event.target.value))}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') setMyHeight(validHeight(event.currentTarget.value));
+                    }}
+                    className="h-8 w-20 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900 outline-none focus:border-blue-600"
+                  />
+                  {myHeight !== null && (
+                    <span className={fitting.length > 0 ? 'font-semibold text-green-700' : 'text-gray-500'}>
+                      {fitting.length > 0
+                        ? t('product.heightFits', { sizes: fitting.join(', ') })
+                        : t('product.heightNoFit')}
+                    </span>
+                  )}
+                </div>
+              )}
               {heights.length > 0 && (
                 <div className="mt-3 rounded-lg bg-gray-50 p-3">
                   <p className="text-xs font-medium text-gray-600">{t('product.heights')}</p>
@@ -280,37 +360,47 @@ function ProductView({ product }: { product: ProductDetail }) {
 
         {canBuy && (
           <div>
-            <button
-              onClick={() => (selected ? setCheckout(true) : setBuyHint(true))}
-              disabled={selected?.availability === 'out_of_stock'}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-gray-900 text-base font-semibold text-white transition-colors hover:bg-black active:scale-[0.99] disabled:opacity-50"
-            >
-              <ShoppingBag className="h-5 w-5" />
-              {t('buy.button')}
-              <span className="font-normal text-white/70">
-                · {formatPrice(selected?.price_minor ?? product.price_minor)}
-              </span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={buyNow}
+                disabled={selected?.availability === 'out_of_stock' || opening}
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-gray-900 text-base font-semibold text-white transition-colors hover:bg-black active:scale-[0.99] disabled:opacity-50"
+              >
+                <ShoppingBag className="h-5 w-5" />
+                {t('buy.button')}
+                {/* The price is already shown above; on narrow phones it would wrap here. */}
+                <span className="hidden whitespace-nowrap font-normal text-white/70 sm:inline">
+                  · {formatPrice(selected?.price_minor ?? product.price_minor)}
+                </span>
+              </button>
+              {inCart ? (
+                <Link
+                  href="/cart"
+                  className="flex h-12 items-center justify-center rounded-full border border-blue-600 px-5 text-sm font-semibold text-blue-600"
+                >
+                  {t('buy.inCart')}
+                </Link>
+              ) : (
+                <button
+                  onClick={() => (selected ? addToCart(selected.id) : setBuyHint(true))}
+                  disabled={selected?.availability === 'out_of_stock'}
+                  className="flex h-12 items-center justify-center gap-2 rounded-full border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-900 transition-colors hover:border-gray-900 disabled:opacity-50"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  {t('buy.toCart')}
+                </button>
+              )}
+            </div>
             {buyHint && !selected && (
               <p role="alert" className="mt-1.5 text-center text-sm text-red-700">
                 {t('buy.chooseFirst')}
               </p>
             )}
+            <FormError error={buyError} />
           </div>
         )}
-        {checkout && selected && payments && (
-          <CheckoutSheet
-            options={payments}
-            item={{
-              variantId: selected.id,
-              title: product.title,
-              image: product.images[0] ?? null,
-              size: selected.size_label,
-              color: selected.color?.name ?? null,
-              priceMinor: selected.price_minor,
-            }}
-            onClose={() => setCheckout(false)}
-          />
+        {checkout && payments && (
+          <CheckoutSheet options={payments} store={checkout} onClose={() => setCheckout(null)} />
         )}
 
         <ContactButton
@@ -333,6 +423,22 @@ function ProductView({ product }: { product: ProductDetail }) {
         {store.is_demo && <DemoNotice />}
       </div>
     </main>
+  );
+}
+
+// A row of products that look like this one, found by comparing photos.
+function SimilarProducts({ productId, category }: { productId: string; category: string }) {
+  const { t } = useApp();
+  const { data } = useApi((signal) => getSimilarProducts(productId, signal), [productId]);
+  if (!data || data.items.length === 0) return null;
+  return (
+    <div className="mx-auto max-w-6xl px-4 pt-6 md:px-0">
+      <ProductShelf
+        title={t('product.similar')}
+        href={catalogHref({ category })}
+        products={data.items}
+      />
+    </div>
   );
 }
 
@@ -370,8 +476,11 @@ export default function ProductDetailPage() {
       ) : loading || !product ? (
         <Loading />
       ) : (
-        // The key resets the selected variant when another product is opened.
-        <ProductView key={product.id} product={product} />
+        <>
+          {/* The key resets the selected variant when another product is opened. */}
+          <ProductView key={product.id} product={product} />
+          <SimilarProducts productId={product.id} category={product.category.code} />
+        </>
       )}
 
       <BottomNavigation />

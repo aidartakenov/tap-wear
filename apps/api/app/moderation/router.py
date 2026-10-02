@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,7 @@ from app.database import get_session
 from app.errors import ApiError, not_found
 from app.moderation.models import ModerationLog, Report
 from app.rate_limit import rate_limit
+from app.search.indexer import index_product
 from app.stores.models import Store, StoreStatus
 
 Db = Annotated[AsyncSession, Depends(get_session)]
@@ -189,7 +190,11 @@ async def decide_store(
 
 @admin_router.post("/products/{product_id}/decision")
 async def decide_product(
-    product_id: uuid.UUID, body: DecisionIn, admin: AdminUser, db: Db
+    product_id: uuid.UUID,
+    body: DecisionIn,
+    admin: AdminUser,
+    db: Db,
+    background: BackgroundTasks,
 ) -> DecisionOut:
     product = await db.get(Product, product_id)
     if product is None:
@@ -213,6 +218,10 @@ async def decide_product(
         )
     )
     await db.commit()
+    if body.decision is Decision.APPROVE:
+        # After the response is sent: the product is public at once, and joins
+        # photo search as soon as its photos are indexed.
+        background.add_task(index_product, product.id)
     return DecisionOut(id=product.id, status=product.status)
 
 

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { DatabaseMonitor } from '@/components/admin/DatabaseMonitor';
+import { Overview } from '@/components/admin/Overview';
+import { Users } from '@/components/admin/Users';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import {
   FormError,
@@ -182,11 +184,11 @@ function Moderation() {
   );
 }
 
-type Section = 'moderation' | 'database';
+type Section = 'overview' | 'moderation' | 'users' | 'database';
 
 export default function AdminPage() {
   const { tr } = useApp();
-  const [section, setSection] = useState<Section>('moderation');
+  const [section, setSection] = useState<Section>('overview');
 
   const tab = (value: Section, label: string) => (
     <button
@@ -205,18 +207,32 @@ export default function AdminPage() {
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-6xl px-4 pt-3">
           <h1 className="text-xl font-bold text-gray-900">{tr('Администрирование')}</h1>
-          <div className="mt-2 flex gap-5">
+          <div className="mt-2 flex gap-5 overflow-x-auto whitespace-nowrap">
+            {tab('overview', tr('Обзор'))}
             {tab('moderation', tr('Модерация'))}
+            {tab('users', tr('Пользователи'))}
             {tab('database', tr('База данных'))}
           </div>
         </div>
       </header>
       {/* Moderation reads best in a narrow column; database tables need the width. */}
       <main
-        className={`mx-auto px-4 py-4 ${section === 'database' ? 'max-w-6xl' : 'max-w-3xl'}`}
+        className={`mx-auto px-4 py-4 ${
+          section === 'moderation' || section === 'users' ? 'max-w-3xl' : 'max-w-6xl'
+        }`}
       >
         <RequireAccount admin>
-          {() => (section === 'database' ? <DatabaseMonitor /> : <Moderation />)}
+          {() =>
+            section === 'overview' ? (
+              <Overview />
+            ) : section === 'users' ? (
+              <Users />
+            ) : section === 'database' ? (
+              <DatabaseMonitor />
+            ) : (
+              <Moderation />
+            )
+          }
         </RequireAccount>
       </main>
       <BottomNavigation />

@@ -16,7 +16,8 @@ from app.errors import ApiError
 
 settings = get_settings()
 
-ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
+# AVIF is what many sites serve today, so photos saved from the web are often AVIF.
+ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "AVIF"}
 # Longest side of the stored photo. Larger uploads are scaled down.
 MAX_SIDE = 2000
 # Store avatars are stored as a square of at most this side.
@@ -38,7 +39,7 @@ def process_image(raw: bytes, square_side: int | None = None) -> ProcessedImage:
     at most that side (used for store avatars).
 
     The file name and the declared content type are never trusted: the bytes
-    must decode as a JPEG, PNG or WebP image. The picture is re-encoded, which
+    must decode as a JPEG, PNG, WebP or AVIF image. The picture is re-encoded, which
     drops EXIF data (camera, GPS position) and anything else hidden in the file.
     """
     if len(raw) > settings.upload_max_bytes:
@@ -46,7 +47,9 @@ def process_image(raw: bytes, square_side: int | None = None) -> ProcessedImage:
         raise ApiError(413, "file_too_large", f"The file is larger than {limit_mb} MB")
 
     unsupported = ApiError(
-        422, "unsupported_image", "Upload a JPEG, PNG or WebP image. HEIC is not supported yet"
+        422,
+        "unsupported_image",
+        "Upload a JPEG, PNG, WebP or AVIF image. HEIC is not supported yet",
     )
     try:
         image = Image.open(io.BytesIO(raw))
