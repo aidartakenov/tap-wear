@@ -682,3 +682,32 @@ def test_store_must_say_who_it_sells_for(owner, store):
     )
     # Duplicates are dropped and the order is fixed.
     assert changed.json()["audiences"] == ["women", "kids"]
+
+
+# --- Database view for the administrator ----------------------------------------
+
+
+def test_database_view_is_read_only_for_admins_and_hides_secrets(owner, admin):
+    assert owner.get("/admin/database").status_code == 403
+    assert owner.get("/admin/database/tables/users").status_code == 403
+
+    overview = admin.get("/admin/database").json()
+    listed = {table["name"]: table for table in overview["tables"]}
+    assert {"users", "stores", "products", "sessions"} <= set(listed)
+    assert listed["users"]["rows"] >= 2 and listed["users"]["size_bytes"] > 0
+    assert overview["size_bytes"] > 0
+
+    users = admin.get("/admin/database/tables/users", params={"q": "owner@shop.test"}).json()
+    names = [column["name"] for column in users["columns"]]
+    row = dict(zip(names, users["rows"][0], strict=True))
+    assert users["total"] == 1 and row["email"] == "owner@shop.test"
+    # Password hashes and session tokens never leave the server.
+    assert row["password_hash"] == "•••"
+    sessions = admin.get("/admin/database/tables/sessions", params={"limit": 1}).json()
+    session = dict(zip([c["name"] for c in sessions["columns"]], sessions["rows"][0], strict=True))
+    assert session["token_hash"] == "•••" and session["csrf_token"] == "•••"
+
+    assert admin.get("/admin/database/tables/pg_user").status_code == 404
+    by_secret = admin.get("/admin/database/tables/users", params={"sort": "password_hash"})
+    assert by_secret.status_code == 422
+    assert admin.post("/admin/database/tables/users", json={}).status_code == 405

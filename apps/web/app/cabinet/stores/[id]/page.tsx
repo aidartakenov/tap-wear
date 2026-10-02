@@ -9,6 +9,7 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { AvatarUploader } from '@/components/cabinet/AvatarUploader';
 import { PolicyForm } from '@/components/cabinet/PolicyForm';
 import { StoreForm } from '@/components/cabinet/StoreForm';
+import { StoreOrders } from '@/components/cabinet/StoreOrders';
 import { StoreStatistics } from '@/components/cabinet/StoreStatistics';
 import {
   FormError,
@@ -41,7 +42,7 @@ import { Availability, Member, MerchantProduct, MerchantStore, Reference } from 
 import { useApi } from '@/lib/useApi';
 import { useApp } from '@/lib/context';
 
-type Tab = 'products' | 'statistics' | 'conditions' | 'profile' | 'members';
+type Tab = 'products' | 'orders' | 'statistics' | 'conditions' | 'profile' | 'members';
 
 const availabilityShort: Record<Availability, string> = {
   in_stock: 'Есть',
@@ -306,6 +307,7 @@ function StoreCabinet({ storeId }: { storeId: string }) {
 
       <div className="flex gap-5 overflow-x-auto border-b border-gray-200 whitespace-nowrap">
         {tabButton('products', tr('Товары ({n})', { n: data.products.length }))}
+        {tabButton('orders', tr('Заказы'))}
         {tabButton('statistics', tr('Статистика'))}
         {tabButton('conditions', tr('Доставка и возврат'))}
         {tabButton('profile', tr('Профиль магазина'))}
@@ -337,6 +339,8 @@ function StoreCabinet({ storeId }: { storeId: string }) {
           )}
         </section>
       )}
+
+      {tab === 'orders' && <StoreOrders storeId={store.id} />}
 
       {tab === 'statistics' && <StoreStatistics storeId={store.id} />}
 
@@ -375,7 +379,7 @@ export default function StoreCabinetPage() {
   const { tr } = useApp();
   const storeId = String(useParams().id);
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-24 md:pb-32">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-2">
           <Link href="/cabinet" aria-label={tr('Назад в кабинет')} className={`${secondaryButton} !px-2.5`}>

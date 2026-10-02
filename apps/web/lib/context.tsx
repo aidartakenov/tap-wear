@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import * as api from './api';
 import {
   LOCALE_COOKIE,
+  THEME_COOKIE,
   Locale,
   Translate,
   TranslateSource,
@@ -21,6 +22,8 @@ interface AppContextType {
   tr: TranslateSource;
   count: (count: number, noun: 'product' | 'store') => string;
   setLocale: (locale: Locale) => void;
+  dark: boolean;
+  setDark: (dark: boolean) => void;
   // What the catalog contains (audiences, categories, sizes, stores); null if the API is down.
   catalog: CatalogFilters | null;
   // The signed-in account: undefined while it is being checked, null for a guest.
@@ -48,10 +51,12 @@ export function AppProvider({
   children,
   catalog,
   locale,
+  dark: initialDark,
 }: {
   children: ReactNode;
   catalog: CatalogFilters | null;
   locale: Locale;
+  dark: boolean;
 }) {
   // Set during render, so that requests made by child effects already use it.
   api.setApiLocale(locale);
@@ -63,6 +68,14 @@ export function AppProvider({
     // and names coming from the API switch language too.
     document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
     window.location.reload();
+  };
+
+  const [dark, setDarkState] = useState(initialDark);
+  const setDark = (next: boolean) => {
+    // Applied at once; the cookie makes the server render the same theme next time.
+    document.documentElement.classList.toggle('dark', next);
+    document.cookie = `${THEME_COOKIE}=${next ? 'dark' : 'light'}; path=/; max-age=31536000; samesite=lax`;
+    setDarkState(next);
   };
 
   const [me, setAccount] = useState<Me | null | undefined>(undefined);
@@ -166,6 +179,8 @@ export function AppProvider({
         tr,
         count: (count, noun) => countLabel(locale, count, noun),
         setLocale,
+        dark,
+        setDark,
         catalog,
         me,
         signIn,

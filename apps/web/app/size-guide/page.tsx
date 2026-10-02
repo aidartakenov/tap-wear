@@ -69,7 +69,7 @@ export default function SizeGuidePage() {
   const text = sizeGuide[parseLocale(cookies().get(LOCALE_COOKIE)?.value)];
 
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-24 md:pb-32">
       <header className="bg-white border-b border-gray-200">
         <div className="mx-auto max-w-3xl px-4 py-3">
           <h1 className="text-xl font-bold text-gray-900">{text.title}</h1>

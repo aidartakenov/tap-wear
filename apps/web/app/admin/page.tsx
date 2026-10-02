@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { DatabaseMonitor } from '@/components/admin/DatabaseMonitor';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import {
   FormError,
@@ -181,17 +182,42 @@ function Moderation() {
   );
 }
 
+type Section = 'moderation' | 'database';
+
 export default function AdminPage() {
   const { tr } = useApp();
+  const [section, setSection] = useState<Section>('moderation');
+
+  const tab = (value: Section, label: string) => (
+    <button
+      onClick={() => setSection(value)}
+      aria-current={section === value}
+      className={`border-b-2 px-1 pb-2 text-sm font-medium ${
+        section === value ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600'
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-24 md:pb-32">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
-        <div className="mx-auto max-w-3xl px-4 py-3">
-          <h1 className="text-xl font-bold text-gray-900">{tr('Модерация')}</h1>
+        <div className="mx-auto max-w-6xl px-4 pt-3">
+          <h1 className="text-xl font-bold text-gray-900">{tr('Администрирование')}</h1>
+          <div className="mt-2 flex gap-5">
+            {tab('moderation', tr('Модерация'))}
+            {tab('database', tr('База данных'))}
+          </div>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-4">
-        <RequireAccount admin>{() => <Moderation />}</RequireAccount>
+      {/* Moderation reads best in a narrow column; database tables need the width. */}
+      <main
+        className={`mx-auto px-4 py-4 ${section === 'database' ? 'max-w-6xl' : 'max-w-3xl'}`}
+      >
+        <RequireAccount admin>
+          {() => (section === 'database' ? <DatabaseMonitor /> : <Moderation />)}
+        </RequireAccount>
       </main>
       <BottomNavigation />
     </div>

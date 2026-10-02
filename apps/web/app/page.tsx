@@ -53,7 +53,7 @@ async function loadHome(locale: Locale) {
 
 function Unavailable({ t }: { t: Translate }) {
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-24 md:pb-32">
       <main className="mx-auto max-w-6xl px-4 py-16 text-center">
         <h1 className="text-xl font-bold text-gray-900">{t('home.unavailable')}</h1>
         <p className="mt-2 text-sm text-gray-500">
@@ -81,8 +81,24 @@ export default async function HomePage() {
   const heroImages = tiles.map((tile) => tile.cover!).slice(0, 3);
 
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-24 md:pb-32">
       <main className="mx-auto max-w-6xl px-4 py-4 md:py-6 space-y-8 md:space-y-12">
+        {/* The slogan spells out the name, in the logo's colours: Tap is dark, Wear is blue. */}
+        <section className="pt-2 md:flex md:items-end md:justify-between md:gap-10 md:pt-6">
+          <div>
+            <h1 className="text-[2.75rem] font-extrabold leading-[0.95] tracking-tighter text-gray-900 sm:text-7xl lg:text-8xl">
+              <span className="block">{t('home.sloganTap')}</span>
+              <span className="block">
+                <span className="text-gray-300">{t('home.sloganAnd')}</span>{' '}
+                <span className="text-blue-600">{t('home.sloganWear')}</span>
+              </span>
+            </h1>
+          </div>
+          <p className="mt-3 max-w-sm text-sm text-gray-600 md:mt-0 md:pb-1 md:text-base">
+            {t('home.about')}
+          </p>
+        </section>
+
         <section id="audience" aria-label={t('filter.audience')} className="scroll-mt-4 md:pb-8">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">
             {tiles.map((tile, index) => (
@@ -118,7 +134,7 @@ export default async function HomePage() {
                   <h2 className="text-2xl font-extrabold leading-none tracking-tight md:text-4xl">
                     {t(`audience.${tile.audience}`)}
                   </h2>
-                  <p className="mt-1.5 text-xs text-gray-200 md:text-sm">
+                  <p className="mt-1.5 text-xs text-white/85 md:text-sm">
                     {t(`home.tagline.${tile.audience}`)}
                   </p>
                 </div>
@@ -134,15 +150,15 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="relative overflow-hidden rounded-2xl bg-gray-900 text-white">
+        <section className="static-colors relative overflow-hidden rounded-2xl bg-gray-900 text-white dark:ring-1 dark:ring-white/10">
           <div className="grid md:grid-cols-2 items-center">
             <div className="p-6 md:p-8">
               <p className="text-xs font-semibold uppercase tracking-widest text-blue-300 mb-3">
                 {t('home.eyebrow')}
               </p>
-              <h1 className="text-2xl md:text-4xl font-extrabold leading-tight tracking-tight">
+              <h2 className="text-2xl md:text-4xl font-extrabold leading-tight tracking-tight">
                 {t('home.heroTitle')}
-              </h1>
+              </h2>
               <p className="mt-3 text-sm md:text-base text-gray-300 max-w-md">
                 {t('home.heroText')}
               </p>

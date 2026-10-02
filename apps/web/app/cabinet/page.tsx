@@ -89,7 +89,7 @@ function Cabinet() {
 export default function CabinetPage() {
   const { tr } = useApp();
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-24 md:pb-32">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-3xl px-4 py-3">
           <h1 className="text-xl font-bold text-gray-900">{tr('Кабинет магазина')}</h1>

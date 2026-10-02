@@ -20,6 +20,10 @@ import {
   StoreAnalytics,
   StoreInput,
   VariantInput,
+  MerchantOrder,
+  Order,
+  PaymentMethod,
+  PaymentOptions,
 } from './types';
 
 const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1';
@@ -288,6 +292,21 @@ export function uploadProductImage(productId: string, file: File) {
 export const deleteProductImage = (productId: string, imageId: string) =>
   send<MerchantProduct>('DELETE', `/merchant/products/${productId}/images/${imageId}`);
 
+// --- Orders and payment -----------------------------------------------------------
+
+export const getPaymentOptions = (signal?: AbortSignal) =>
+  get<PaymentOptions>('/payments/options', undefined, signal);
+export const createOrder = (variantId: string, method: PaymentMethod, phone: string) =>
+  send<Order>('POST', '/orders', { variant_id: variantId, payment_method: method, phone });
+export const getOrder = (id: string, signal?: AbortSignal) =>
+  get<Order>(`/orders/${id}`, undefined, signal);
+export const getMyOrders = (signal?: AbortSignal) => get<Order[]>('/me/orders', undefined, signal);
+// Stands in for the bank's confirmation while payments run in test mode.
+export const confirmTestPayment = (id: string) => send<Order>('POST', `/orders/${id}/test-pay`);
+export const cancelOrder = (id: string) => send<Order>('POST', `/orders/${id}/cancel`);
+export const getStoreOrders = (storeId: string, signal?: AbortSignal) =>
+  get<MerchantOrder[]>('/merchant/orders', new URLSearchParams({ store_id: storeId }), signal);
+
 // --- Moderation and reports ---------------------------------------------------
 
 export const getReviewQueue = (signal?: AbortSignal) =>
@@ -298,6 +317,35 @@ export const decide = (
   decision: Decision,
   reason?: string
 ) => send<{ id: string; status: string }>('POST', `/admin/${target}/${id}/decision`, { decision, reason });
+// A read-only view of the database for the administrator.
+export interface DatabaseOverview {
+  database: string;
+  version: string;
+  size_bytes: number;
+  connections: number;
+  tables: { name: string; rows: number; size_bytes: number }[];
+}
+export interface DatabaseTable {
+  name: string;
+  columns: { name: string; type: string; primary_key: boolean; nullable: boolean }[];
+  rows: unknown[][];
+  total: number;
+  sort: string;
+  descending: boolean;
+}
+export const getDatabaseOverview = (signal?: AbortSignal) =>
+  get<DatabaseOverview>('/admin/database', undefined, signal);
+export function getDatabaseTable(
+  name: string,
+  page: { limit: number; offset: number; sort?: string; descending?: boolean; query?: string },
+  signal?: AbortSignal
+) {
+  const params = new URLSearchParams({ limit: String(page.limit), offset: String(page.offset) });
+  if (page.sort) params.set('sort', page.sort);
+  if (page.descending !== undefined) params.set('descending', String(page.descending));
+  if (page.query) params.set('q', page.query);
+  return get<DatabaseTable>(`/admin/database/tables/${encodeURIComponent(name)}`, params, signal);
+}
 export const getReports = (signal?: AbortSignal) => get<Report[]>('/admin/reports', undefined, signal);
 export const resolveReport = (id: string, resolution: string) =>
   send<void>('POST', `/admin/reports/${id}/resolve`, { resolution });

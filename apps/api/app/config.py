@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, PostgresDsn, SecretStr, field_validator
+from pydantic import Field, PostgresDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # apps/api/.env, resolved from this file so it loads regardless of the working directory.
@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     session_ttl_hours: int = Field(default=24 * 14, gt=0)
     login_max_failures: int = Field(default=5, gt=0)
     login_lock_minutes: int = Field(default=15, gt=0)
+
+    # Online payment. "none": buying is switched off. "test": the bank's
+    # confirmation is simulated and no money moves (never allowed in production).
+    payment_provider: Literal["none", "test"] = "none"
 
     # Email. "console" writes messages to the log instead of sending them.
     email_backend: Literal["console", "smtp"] = "console"
@@ -78,6 +82,14 @@ class Settings(BaseSettings):
     # IVFFlat indexes support at most 2000 dimensions.
     embedding_model_name: str = "clip-ViT-B-32"
     embedding_dimensions: int = Field(default=512, gt=0, le=2000)
+
+    @model_validator(mode="after")
+    def no_simulated_payments_in_production(self):
+        if self.environment == "production" and self.payment_provider == "test":
+            raise ValueError(
+                "PAYMENT_PROVIDER=test simulates payments and is not allowed in production"
+            )
+        return self
 
     @field_validator("database_url")
     @classmethod

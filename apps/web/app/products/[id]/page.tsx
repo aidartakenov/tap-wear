@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Bookmark, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Bookmark, ChevronRight, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { CheckoutSheet } from '@/components/CheckoutSheet';
 import { ContactButton } from '@/components/ContactButton';
 import { DemoNotice } from '@/components/DemoNotice';
 import { ErrorState, Loading } from '@/components/PageState';
@@ -13,7 +14,7 @@ import { ReportProblem } from '@/components/ReportProblem';
 import { StoreAvatar } from '@/components/StoreAvatar';
 import { StoreConditions } from '@/components/StoreConditions';
 import { track } from '@/lib/analytics';
-import { getProduct } from '@/lib/api';
+import { getPaymentOptions, getProduct } from '@/lib/api';
 import { colorSwatches, formatHeight, formatPrice } from '@/lib/catalog';
 import { Locale, optionalKey } from '@/lib/i18n';
 import { useApp } from '@/lib/context';
@@ -63,6 +64,11 @@ function ProductView({ product }: { product: ProductDetail }) {
         ? product.variants.find((variant) => fits(variant, size, color))
         : undefined;
   const { t, locale } = useApp();
+  // Buying is offered when online payment is on and the product is a real offer.
+  const { data: payments } = useApi((signal) => getPaymentOptions(signal), []);
+  const canBuy = !!payments?.enabled && !store.is_demo;
+  const [checkout, setCheckout] = useState(false);
+  const [buyHint, setBuyHint] = useState(false);
   const systemKey = optionalKey(`sizeSystem.${product.size_system}`);
   const sizeSystem = systemKey ? t(systemKey) : product.size_system;
 
@@ -272,6 +278,41 @@ function ProductView({ product }: { product: ProductDetail }) {
           </Card>
         </Link>
 
+        {canBuy && (
+          <div>
+            <button
+              onClick={() => (selected ? setCheckout(true) : setBuyHint(true))}
+              disabled={selected?.availability === 'out_of_stock'}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-gray-900 text-base font-semibold text-white transition-colors hover:bg-black active:scale-[0.99] disabled:opacity-50"
+            >
+              <ShoppingBag className="h-5 w-5" />
+              {t('buy.button')}
+              <span className="font-normal text-white/70">
+                · {formatPrice(selected?.price_minor ?? product.price_minor)}
+              </span>
+            </button>
+            {buyHint && !selected && (
+              <p role="alert" className="mt-1.5 text-center text-sm text-red-700">
+                {t('buy.chooseFirst')}
+              </p>
+            )}
+          </div>
+        )}
+        {checkout && selected && payments && (
+          <CheckoutSheet
+            options={payments}
+            item={{
+              variantId: selected.id,
+              title: product.title,
+              image: product.images[0] ?? null,
+              size: selected.size_label,
+              color: selected.color?.name ?? null,
+              priceMinor: selected.price_minor,
+            }}
+            onClose={() => setCheckout(false)}
+          />
+        )}
+
         <ContactButton
           store={store}
           inquiry={{
@@ -303,7 +344,7 @@ export default function ProductDetailPage() {
   const favorite = isFavorite(id);
 
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-24 md:pb-32">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
           <Button variant="ghost" size="icon" aria-label={t('common.back')} onClick={() => router.back()}>

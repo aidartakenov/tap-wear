@@ -3,7 +3,7 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Bookmark, ChevronRight, LogOut, Shield, Store, User } from 'lucide-react';
+import { Bookmark, ChevronRight, LogOut, Shield, ShoppingBag, Store, User } from 'lucide-react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { Loading } from '@/components/PageState';
 import { VerifyEmailNotice } from '@/components/VerifyEmailNotice';
@@ -144,7 +144,7 @@ export default function ProfilePage() {
   const { me, signOut, favorites, t, count } = useApp();
 
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-24 md:pb-32">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
         <div className="mx-auto max-w-6xl px-4 py-3">
           <h1 className="text-xl font-bold text-gray-900">{t(me ? 'profile.title' : 'nav.profile')}</h1>
@@ -194,6 +194,14 @@ export default function ProfilePage() {
                   : t(me ? 'profile.favAccount' : 'profile.favDevice')
               }
             />
+            {me && (
+              <Row
+                href="/orders"
+                icon={ShoppingBag}
+                title={t('profile.orders')}
+                text={t('profile.ordersText')}
+              />
+            )}
             {me && (
               <Row
                 href="/cabinet"

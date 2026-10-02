@@ -75,7 +75,7 @@ function Cover({ store }: { store: Store }) {
   );
 
   return (
-    <section className="relative overflow-hidden bg-gray-900 text-white">
+    <section className="static-colors relative overflow-hidden bg-gray-900 text-white">
       {/* The store's own photos, dimmed, as the backdrop of its cover. */}
       <div className="absolute inset-0 grid grid-cols-3 opacity-25" aria-hidden>
         {store.preview_images.map((image) => (
@@ -503,7 +503,7 @@ function StorePage() {
 
 export default function StoreProfilePage() {
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-24 md:pb-32">
       {/* useSearchParams needs a Suspense boundary for the production build. */}
       <Suspense>
         <StorePage />

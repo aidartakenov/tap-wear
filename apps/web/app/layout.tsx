@@ -6,7 +6,7 @@ import { AppProvider } from "@/lib/context";
 import { SiteHeader } from "@/components/SiteHeader";
 import { cookies } from "next/headers";
 import { getCatalogFilters } from "@/lib/api";
-import { LOCALE_COOKIE, parseLocale, translator } from "@/lib/i18n";
+import { LOCALE_COOKIE, THEME_COOKIE, parseLocale, translator } from "@/lib/i18n";
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'], variable: '--font-sans' });
 
@@ -28,12 +28,14 @@ export default async function RootLayout({
   // The header menu and the filter controls are built from what the catalog contains.
   // If the API is down the pages still render and show their own error state.
   const locale = parseLocale(cookies().get(LOCALE_COOKIE)?.value);
+  // The theme is read on the server, so a dark page never flashes light while loading.
+  const dark = cookies().get(THEME_COOKIE)?.value === 'dark';
   const catalog = await getCatalogFilters(undefined, locale).catch(() => null);
 
   return (
-    <html lang={locale} className={cn("font-sans", inter.variable)}>
+    <html lang={locale} className={cn("font-sans", inter.variable, dark && "dark")}>
       <body className="antialiased min-w-[360px] bg-gray-50">
-        <AppProvider catalog={catalog} locale={locale}>
+        <AppProvider catalog={catalog} locale={locale} dark={dark}>
           <SiteHeader />
           {children}
         </AppProvider>

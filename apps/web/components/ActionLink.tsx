@@ -9,7 +9,8 @@ const variants = {
   // Dark pill, blue puck. The default on light backgrounds.
   ink: {
     pill: 'bg-gray-900 text-white hover:bg-black',
-    puck: 'bg-blue-600 text-white',
+    // In the dark theme the pill itself is blue, so the puck goes darker.
+    puck: 'bg-blue-600 text-white dark:bg-[#0b0f17]/35',
   },
   // White pill, blue puck. For the one most important action on a dark panel.
   light: {

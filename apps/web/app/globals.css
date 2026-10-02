@@ -27,25 +27,85 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    /* Native controls (select lists, scrollbars) follow the theme. */
+    color-scheme: dark;
+    --background: 220 35% 7%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 221 31% 12%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 221 31% 12%;
     --popover-foreground: 210 40% 98%;
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 220 29% 16%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
+    --muted: 220 29% 16%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 220 29% 16%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 220 26% 21%;
+    --input: 220 26% 21%;
     --ring: 224.3 76.3% 48%;
+  }
+
+  /* The neutral palette behind Tailwind's white, black and gray utilities
+     (see tailwind.config.ts). ".static-colors" keeps the light values inside a
+     dark page, for panels that are dark by design (the banner, a shop's cover). */
+  :root,
+  .static-colors {
+    --bg-white: 255 255 255;
+    --bg-black: 0 0 0;
+    --bg-gray-50: 249 250 251;
+    --bg-gray-100: 243 244 246;
+    --bg-gray-200: 229 231 235;
+    --bg-gray-300: 209 213 219;
+    --bg-gray-700: 55 65 81;
+    --bg-gray-900: 17 24 39;
+    --text-gray-200: 229 231 235;
+    --text-gray-300: 209 213 219;
+    --text-gray-400: 156 163 175;
+    --text-gray-500: 107 114 128;
+    --text-gray-600: 75 85 99;
+    --text-gray-700: 55 65 81;
+    --text-gray-800: 31 41 55;
+    --text-gray-900: 17 24 39;
+    --border-gray-100: 243 244 246;
+    --border-gray-200: 229 231 235;
+    --border-gray-300: 209 213 219;
+    --border-gray-400: 156 163 175;
+    --border-gray-700: 55 65 81;
+    --border-gray-900: 17 24 39;
+    --ring-white: 255 255 255;
+  }
+
+  .dark {
+    /* Surfaces: page, cards, insets. */
+    --bg-white: 21 27 40;
+    --bg-gray-50: 11 15 23;
+    --bg-gray-100: 30 38 54;
+    --bg-gray-200: 39 48 66;
+    --bg-gray-300: 55 65 81;
+    --bg-gray-700: 71 85 105;
+    /* What is dark ink on a light page (buttons, chosen chips) is the accent here. */
+    --bg-gray-900: 37 99 235;
+    --bg-black: 29 78 216;
+    --text-gray-200: 55 65 81;
+    --text-gray-300: 75 85 99;
+    --text-gray-400: 107 116 131;
+    --text-gray-500: 139 148 163;
+    --text-gray-600: 168 176 189;
+    --text-gray-700: 209 213 219;
+    --text-gray-800: 229 231 235;
+    --text-gray-900: 243 244 246;
+    --border-gray-100: 31 39 53;
+    --border-gray-200: 39 48 66;
+    --border-gray-300: 55 65 81;
+    --border-gray-400: 107 116 131;
+    --border-gray-700: 107 116 131;
+    --border-gray-900: 229 231 235;
+    --ring-white: 21 27 40;
   }
 }
 
@@ -64,7 +124,7 @@
 @layer components {
   .notch-tile {
     --notch-radius: 26px;
-    --page-bg: #f9fafb; /* must match the body background (gray-50) */
+    --page-bg: rgb(var(--bg-gray-50)); /* the body background (gray-50) */
     position: relative;
     overflow: hidden;
     border-radius: var(--notch-radius);
@@ -101,4 +161,37 @@
     right: 100%;
     bottom: 0;
   }
+}
+
+/* Tinted notices and status chips are pale blocks with dark text on a light
+   page. On a dark page they become deep tints with pale text instead. */
+.dark :is(.bg-amber-50, .bg-amber-100) {
+  background-color: rgb(120 53 15 / 0.3);
+}
+.dark :is(.bg-red-50, .bg-red-100) {
+  background-color: rgb(127 29 29 / 0.35);
+}
+.dark .bg-green-100 {
+  background-color: rgb(20 83 45 / 0.45);
+}
+.dark .bg-blue-50 {
+  background-color: rgb(37 99 235 / 0.18);
+}
+.dark :is(.text-amber-800, .text-amber-900, .text-amber-950) {
+  color: rgb(252 211 77);
+}
+.dark :is(.text-red-700, .text-red-800) {
+  color: rgb(252 165 165);
+}
+.dark :is(.text-green-700, .text-green-800) {
+  color: rgb(134 239 172);
+}
+.dark :is(.text-blue-900, .text-blue-950) {
+  color: rgb(191 219 254);
+}
+.dark .text-blue-600:not(.static-colors *) {
+  color: rgb(96 165 250);
+}
+.dark :is(.border-amber-200, .border-red-200, .border-blue-200) {
+  border-color: rgb(255 255 255 / 0.12);
 }

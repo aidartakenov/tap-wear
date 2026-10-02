@@ -3,8 +3,10 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bookmark, Camera, CircleUserRound, Search, Store } from 'lucide-react';
+import { Bookmark, Camera, CircleUserRound, Moon, Search, Store, Sun } from 'lucide-react';
 import { ActionLink } from '@/components/ActionLink';
+import { hasBottomNavigation } from '@/components/BottomNavigation';
+import { Logo } from '@/components/Logo';
 import { catalogHref } from '@/lib/catalog';
 import { Key, LOCALES, localeNames } from '@/lib/i18n';
 import { useApp } from '@/lib/context';
@@ -19,7 +21,7 @@ const desktopLinks: { href: string; label: Key; icon: typeof Search }[] = [
 export function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
-  const { favorites, catalog, me, t, locale, setLocale } = useApp();
+  const { favorites, catalog, me, t, locale, setLocale, dark, setDark } = useApp();
   const audiences = catalog?.audiences ?? [];
   const categories = catalog?.categories ?? [];
   const [query, setQuery] = useState('');
@@ -31,12 +33,12 @@ export function SiteHeader() {
 
   return (
     <header className="bg-white border-b border-gray-200">
-      <div className="mx-auto max-w-6xl px-4 h-14 flex items-center gap-3 md:gap-6">
-        <Link href="/" className="text-xl font-extrabold tracking-tight text-gray-900 shrink-0">
-          Tap<span className="text-blue-600">Wear</span>
+      <div className="mx-auto max-w-6xl px-4 h-14 flex items-center gap-2 sm:gap-3 md:gap-6">
+        <Link href="/" aria-label="TapWear" className="shrink-0">
+          <Logo />
         </Link>
 
-        <form onSubmit={submitSearch} role="search" className="relative min-w-40 flex-1 md:max-w-md md:mr-auto">
+        <form onSubmit={submitSearch} role="search" className="relative min-w-20 flex-1 sm:min-w-40 md:max-w-md md:mr-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="search"
@@ -69,6 +71,15 @@ export function SiteHeader() {
           ))}
         </div>
 
+        <button
+          onClick={() => setDark(!dark)}
+          aria-label={t(dark ? 'nav.lightTheme' : 'nav.darkTheme')}
+          title={t(dark ? 'nav.lightTheme' : 'nav.darkTheme')}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 text-gray-700 transition-colors hover:bg-gray-100 md:-ml-3"
+        >
+          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+
         <nav className="hidden md:flex items-center gap-1">
           {desktopLinks.map(({ href, label, icon: Icon }) => (
             <Link
@@ -91,9 +102,12 @@ export function SiteHeader() {
               )}
             </Link>
           ))}
-          <ActionLink href="/search" icon={Camera} size="sm" className="ml-2">
-            {t('nav.photoSearch')}
-          </ActionLink>
+          {/* Pages with the bar at the bottom have photo search there. */}
+          {!hasBottomNavigation(pathname) && (
+            <ActionLink href="/search" icon={Camera} size="sm" className="ml-2">
+              {t('nav.photoSearch')}
+            </ActionLink>
+          )}
         </nav>
       </div>
 

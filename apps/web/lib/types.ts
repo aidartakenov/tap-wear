@@ -314,3 +314,39 @@ export interface StoreAnalytics {
   daily: { date: string; product_views: number; contact_clicks: number }[];
   freshness: { in_stock_variants: number; confirmed_recently: number; needs_confirmation: number };
 }
+
+// --- Orders and payment -------------------------------------------------------
+
+export type PaymentMethod = 'mbank' | 'optima' | 'obank';
+export type OrderStatus = 'pending_payment' | 'paid' | 'cancelled';
+
+export interface PaymentOptions {
+  enabled: boolean;
+  // True while payments are simulated and no money moves.
+  test_mode: boolean;
+  methods: { code: PaymentMethod; name: string }[];
+}
+
+export interface Order {
+  id: string;
+  number: number;
+  status: OrderStatus;
+  title: string;
+  size_label: string | null;
+  color_name: string | null;
+  image_url: string | null;
+  price_minor: number;
+  product_id: string | null;
+  store_name: string;
+  store_slug: string;
+  payment_method: PaymentMethod;
+  payment_method_name: string;
+  test_mode: boolean;
+  created_at: string;
+  paid_at: string | null;
+}
+
+export interface MerchantOrder extends Order {
+  buyer_name: string;
+  buyer_phone: string;
+}

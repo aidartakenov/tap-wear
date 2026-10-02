@@ -30,6 +30,7 @@ os.environ["DATABASE_URL"] = test_url.render_as_string(hide_password=False)
 os.environ["MINIO_BUCKET_ASSETS"] = "tapwear-test-assets"
 # Every test request comes from one address; limits are switched on only where tested.
 os.environ["RATE_LIMIT_ENABLED"] = "false"
+os.environ["PAYMENT_PROVIDER"] = "test"
 if not dotenv.get("MINIO_ACCESS_KEY"):
     os.environ.setdefault("MINIO_ACCESS_KEY", "test")
     os.environ.setdefault("MINIO_SECRET_KEY", "test")

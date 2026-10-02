@@ -47,7 +47,7 @@ export default function LoginPage() {
   );
 
   return (
-    <div className="min-h-screen pb-24 md:pb-12">
+    <div className="min-h-screen pb-24 md:pb-32">
       <main className="mx-auto max-w-md px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900">
           {t(mode === 'login' ? 'login.title' : 'login.newAccount')}

@@ -7,6 +7,8 @@ export type Locale = 'ru' | 'ky';
 
 export const LOCALES: Locale[] = ['ru', 'ky'];
 export const LOCALE_COOKIE = 'tapwear.locale';
+// 'dark' or 'light'; without the cookie the site is light.
+export const THEME_COOKIE = 'tapwear.theme';
 export const localeNames: Record<Locale, string> = { ru: 'Русский', ky: 'Кыргызча' };
 
 const dictionaries: Record<Locale, Record<Key, string>> = { ru, ky };

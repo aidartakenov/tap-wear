@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The TapWear app icon: a dark T and a blue W on a white rounded square. -->
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="1"/>
+  <g stroke-linejoin="round" stroke-width="0.8">
+    <path d="M6.2 18.8H29v5.9h-8.5V46.3H14V24.7H6.2z" fill="#0b172a" stroke="#0b172a"/>
+    <path d="M24.6 27.2h6.3l2.7 9L38.2 23h4.9l3.7 13 4.1-13h6.8l-8.1 23.3H44l-3.6-12.7L36 46.3h-5.5z" fill="#0866ff" stroke="#0866ff"/>
+  </g>
+</svg>
