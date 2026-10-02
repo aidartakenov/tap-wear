@@ -1,0 +1,104 @@
+'use client';
+
+import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { BottomNavigation } from '@/components/BottomNavigation';
+import { Field, FormError, inputClass, primaryButton } from '@/components/form';
+import { useApp } from '@/lib/context';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const { signIn, signUp } = useApp();
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const me = await (mode === 'login' ? signIn(email, password) : signUp(email, password, name));
+      // Sellers land in their cabinet; a new account starts by creating a store.
+      router.push(me.is_admin ? '/admin' : '/cabinet');
+    } catch (cause) {
+      setError(cause);
+      setBusy(false);
+    }
+  };
+
+  const tab = (value: 'login' | 'register', label: string) => (
+    <button
+      type="button"
+      onClick={() => {
+        setMode(value);
+        setError(null);
+      }}
+      className={`flex-1 rounded-md py-2 text-sm font-medium ${
+        mode === value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="min-h-screen pb-24 md:pb-12">
+      <main className="mx-auto max-w-md px-4 py-8">
+        <h1 className="text-2xl font-bold text-gray-900">Кабинет магазина</h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Вход для владельцев и сотрудников магазинов. Покупателям аккаунт не нужен.
+        </p>
+
+        <div className="mt-6 flex gap-1 rounded-lg bg-gray-100 p-1">
+          {tab('login', 'Вход')}
+          {tab('register', 'Регистрация')}
+        </div>
+
+        <form onSubmit={submit} className="mt-4 space-y-4 rounded-xl border border-gray-200 bg-white p-4">
+          {mode === 'register' && (
+            <Field label="Имя">
+              <input
+                className={inputClass}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                autoComplete="name"
+                required
+                maxLength={100}
+              />
+            </Field>
+          )}
+          <Field label="Электронная почта">
+            <input
+              className={inputClass}
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              required
+            />
+          </Field>
+          <Field label="Пароль" hint={mode === 'register' ? 'Не короче 8 символов' : undefined}>
+            <input
+              className={inputClass}
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              required
+              minLength={mode === 'register' ? 8 : undefined}
+            />
+          </Field>
+          <FormError error={error} />
+          <button type="submit" disabled={busy} className={`${primaryButton} w-full`}>
+            {busy ? 'Подождите…' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+          </button>
+        </form>
+      </main>
+      <BottomNavigation />
+    </div>
+  );
+}

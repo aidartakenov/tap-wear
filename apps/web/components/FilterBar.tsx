@@ -10,16 +10,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import {
-  ALL,
-  audienceLabels,
-  audienceOptions,
-  categoryOptions,
-  maxPriceSom,
-  sizeOptions,
-  sortLabels,
-  stores,
-} from '@/lib/catalog';
+import { ALL, audienceLabels, sliderMaxSom, sortLabels } from '@/lib/catalog';
+import { useApp } from '@/lib/context';
 import { SortOrder } from '@/lib/types';
 import { useCatalogFilter } from '@/lib/useCatalogFilter';
 
@@ -28,19 +20,6 @@ interface Option {
   label: string;
 }
 
-const audienceItems: Option[] = [
-  { value: ALL, label: 'Для всех' },
-  ...audienceOptions.map((audience) => ({ value: audience, label: audienceLabels[audience] })),
-];
-const categoryItems: Option[] = [{ value: ALL, label: 'Все категории' }, ...categoryOptions];
-const storeItems: Option[] = [
-  { value: ALL, label: 'Все магазины' },
-  ...stores.map((store) => ({ value: store.id, label: store.name })),
-];
-const sizeItems: Option[] = [
-  { value: ALL, label: 'Все размеры' },
-  ...sizeOptions.map((size) => ({ value: size, label: size })),
-];
 const sortItems: Option[] = (Object.keys(sortLabels) as SortOrder[]).map((sort) => ({
   value: sort,
   label: sortLabels[sort],
@@ -78,6 +57,36 @@ function FilterSelect({
 
 export function FilterBar() {
   const { filter, setFilter, resetFilter, activeCount } = useCatalogFilter();
+  const { catalog } = useApp();
+
+  // The choices come from what the catalog actually contains.
+  const audienceItems: Option[] = [
+    { value: ALL, label: 'Для всех' },
+    ...(catalog?.audiences ?? []).map(({ code }) => ({ value: code, label: audienceLabels[code] })),
+  ];
+  const categoryItems: Option[] = [
+    { value: ALL, label: 'Все категории' },
+    ...(catalog?.categories ?? []).map(({ code, name }) => ({ value: code, label: name })),
+  ];
+  const storeItems: Option[] = [
+    { value: ALL, label: 'Все магазины' },
+    ...(catalog?.stores ?? []).map(({ slug, name }) => ({ value: slug, label: name })),
+  ];
+  const colorItems: Option[] = [
+    { value: ALL, label: 'Любой цвет' },
+    ...(catalog?.colors ?? []).map(({ code, name }) => ({ value: code, label: name })),
+  ];
+  const sizeLabels = Array.from(new Set((catalog?.sizes ?? []).map((size) => size.label)));
+  const sizeItems: Option[] = [
+    { value: ALL, label: 'Все размеры' },
+    ...sizeLabels.map((label) => ({ value: label, label })),
+  ];
+  const maxPriceSom = sliderMaxSom(catalog?.price_max_minor ?? 0);
+  const maxPrice = Math.min(filter.maxPrice ?? maxPriceSom, maxPriceSom);
+  // While a handle is dragged the label follows it; the filter (and the request
+  // to the server) changes only when the handle is released.
+  const [priceDraft, setPriceDraft] = useState<[number, number] | null>(null);
+  const priceRange = priceDraft ?? [Math.min(filter.minPrice, maxPrice), maxPrice];
   const [showFilters, setShowFilters] = useState(false);
 
   return (
@@ -131,7 +140,7 @@ export function FilterBar() {
 
       {showFilters && (
         <div className="bg-gray-50 border-t border-gray-200">
-          <div className="mx-auto max-w-6xl px-4 py-3 grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="mx-auto max-w-6xl px-4 py-3 grid grid-cols-2 md:grid-cols-4 gap-3">
             <FilterSelect
               label="Для кого"
               items={audienceItems}
@@ -147,8 +156,14 @@ export function FilterBar() {
             <FilterSelect
               label="Магазин"
               items={storeItems}
-              value={filter.storeId}
-              onChange={(storeId) => setFilter({ storeId })}
+              value={filter.store}
+              onChange={(store) => setFilter({ store })}
+            />
+            <FilterSelect
+              label="Цвет"
+              items={colorItems}
+              value={filter.color}
+              onChange={(color) => setFilter({ color })}
             />
             <FilterSelect
               label="Размер"
@@ -156,26 +171,42 @@ export function FilterBar() {
               value={filter.size || ALL}
               onChange={(size) => setFilter({ size: size === ALL ? '' : size })}
             />
-            <div className="col-span-2 md:col-span-1">
+            <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600 mb-1 block">
-                Цена: {filter.minPrice.toLocaleString('ru-RU')} –{' '}
-                {filter.maxPrice.toLocaleString('ru-RU')} сом
+                Цена: {priceRange[0].toLocaleString('ru-RU')} –{' '}
+                {priceRange[1].toLocaleString('ru-RU')} сом
               </label>
               <div className="h-8 flex items-center px-2">
                 <Slider
                   min={0}
                   max={maxPriceSom}
                   step={500}
-                  value={[filter.minPrice, filter.maxPrice]}
+                  value={priceRange}
                   onValueChange={(value) => {
-                    const minPrice = Array.isArray(value) ? value[0] : value;
-                    const maxPrice = Array.isArray(value) ? value[1] : filter.maxPrice;
-                    setFilter({ minPrice, maxPrice });
+                    if (Array.isArray(value)) setPriceDraft([value[0], value[1]]);
+                  }}
+                  onValueCommitted={(value) => {
+                    if (!Array.isArray(value)) return;
+                    // The top of the slider means "no upper limit".
+                    setFilter({
+                      minPrice: value[0],
+                      maxPrice: value[1] >= maxPriceSom ? null : value[1],
+                    });
+                    setPriceDraft(null);
                   }}
                   className="w-full"
                 />
               </div>
             </div>
+            <label className="col-span-2 flex items-center gap-2 text-sm text-gray-700 md:self-end md:pb-1.5">
+              <input
+                type="checkbox"
+                checked={filter.inStock}
+                onChange={(event) => setFilter({ inStock: event.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              Только с подтверждённым наличием
+            </label>
           </div>
         </div>
       )}

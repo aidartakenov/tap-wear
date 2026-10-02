@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     # Browser origins allowed to call the API (the Next.js dev server by default).
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Sessions. The cookie is HttpOnly; it is marked Secure everywhere except local development.
+    session_cookie_name: str = "topwear_session"
+    session_ttl_hours: int = Field(default=24 * 14, gt=0)
+    login_max_failures: int = Field(default=5, gt=0)
+    login_lock_minutes: int = Field(default=15, gt=0)
+
     # Database. Required: there is deliberately no default, so a missing
     # DATABASE_URL fails at startup instead of falling back to a baked-in credential.
     database_url: PostgresDsn
@@ -40,6 +46,13 @@ class Settings(BaseSettings):
     minio_region: str = "us-east-1"
     minio_bucket_assets: str = "topwear-assets"
     minio_bucket_search_queries: str = "topwear-search-queries"
+    # Base URL under which buyers' browsers can fetch public product photos.
+    storage_public_url: str = "http://localhost:9000"
+
+    # Product photo uploads
+    upload_max_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    upload_max_pixels: int = Field(default=20_000_000, gt=0)
+    product_max_images: int = Field(default=5, gt=0)
 
     # Visual search embeddings. The dimension must match the model's output and
     # the vector(N) column created by the migrations; pgvector's HNSW and
@@ -53,6 +66,10 @@ class Settings(BaseSettings):
         if value.scheme != "postgresql+asyncpg":
             raise ValueError("DATABASE_URL must use the postgresql+asyncpg:// scheme")
         return value
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.environment != "local"
 
     @property
     def sqlalchemy_database_uri(self) -> str:

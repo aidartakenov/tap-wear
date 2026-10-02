@@ -8,7 +8,8 @@ Usage (standard library only):
 
     python3 scripts/import_demo_catalog.py
 
-Writes apps/web/lib/data/demoCatalog.json.
+Writes apps/api/seed/demo_catalog.json. Load it into the database with
+`python -m app.seed` from apps/api.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
-OUTPUT = Path(__file__).resolve().parent.parent / "apps/web/lib/data/demoCatalog.json"
+OUTPUT = Path(__file__).resolve().parent.parent / "apps/api/seed/demo_catalog.json"
 PER_STORE = 30
 DELAY_SECONDS = 0.6
 USER_AGENT = "Mozilla/5.0 (TopWear demo catalog import; local development)"

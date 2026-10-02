@@ -2,12 +2,18 @@
 
 import { ExternalLink, MessageCircle, Phone, Send } from 'lucide-react';
 import { formatPrice } from '@/lib/catalog';
-import { Product, Store } from '@/lib/types';
+import { Store } from '@/lib/types';
 
 interface ContactButtonProps {
   store: Store;
-  // When given, the WhatsApp message names the product the buyer is asking about.
-  product?: Product;
+  // When given, the WhatsApp message names the product and variant the buyer chose.
+  inquiry?: {
+    title: string;
+    priceMinor: number;
+    size: string | null;
+    color: string | null;
+    url: string | null;
+  };
 }
 
 const primary =
@@ -15,10 +21,21 @@ const primary =
 const secondary =
   'inline-flex items-center justify-center w-full rounded-md text-sm font-medium transition-colors h-10 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground';
 
-export function ContactButton({ store, product }: ContactButtonProps) {
-  const message = product
-    ? `Здравствуйте! Интересует товар: ${product.title}\nЦена: ${formatPrice(product.priceMinor)}\n${product.sourceUrl}\n\nПодскажите, пожалуйста, наличие и размеры.`
+export function ContactButton({ store, inquiry }: ContactButtonProps) {
+  const message = inquiry
+    ? [
+        `Здравствуйте! Интересует товар: ${inquiry.title}`,
+        inquiry.size ? `Размер: ${inquiry.size}` : null,
+        inquiry.color ? `Цвет: ${inquiry.color}` : null,
+        `Цена: ${formatPrice(inquiry.priceMinor)}`,
+        inquiry.url,
+        '',
+        'Подскажите, пожалуйста, есть ли в наличии?',
+      ]
+        .filter((line) => line !== null)
+        .join('\n')
     : 'Здравствуйте! Пишу вам с TopWear.';
+  const link = inquiry?.url ?? store.website;
 
   return (
     <div className="space-y-2">
@@ -33,10 +50,12 @@ export function ContactButton({ store, product }: ContactButtonProps) {
           Написать в WhatsApp
         </a>
       ) : (
-        <a href={`tel:${store.phone.replace(/[^\d+]/g, '')}`} className={primary}>
-          <Phone className="w-4 h-4 mr-2" />
-          Позвонить {store.phone}
-        </a>
+        store.phone && (
+          <a href={`tel:${store.phone.replace(/[^\d+]/g, '')}`} className={primary}>
+            <Phone className="w-4 h-4 mr-2" />
+            Позвонить {store.phone}
+          </a>
+        )
       )}
       {store.instagram && (
         <a
@@ -49,15 +68,12 @@ export function ContactButton({ store, product }: ContactButtonProps) {
           Instagram магазина
         </a>
       )}
-      <a
-        href={product ? product.sourceUrl : store.website}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={secondary}
-      >
-        <ExternalLink className="w-4 h-4 mr-2" />
-        {product ? 'Открыть на сайте магазина' : 'Сайт магазина'}
-      </a>
+      {link && (
+        <a href={link} target="_blank" rel="noopener noreferrer" className={secondary}>
+          <ExternalLink className="w-4 h-4 mr-2" />
+          {inquiry ? 'Открыть на сайте магазина' : 'Сайт магазина'}
+        </a>
+      )}
     </div>
   );
 }

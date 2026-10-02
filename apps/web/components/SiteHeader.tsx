@@ -4,7 +4,7 @@ import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Camera, Heart, Search, Store, User } from 'lucide-react';
-import { ALL, audienceLabels, audienceOptions, catalogHref, categoriesFor } from '@/lib/catalog';
+import { audienceLabels, catalogHref } from '@/lib/catalog';
 import { useApp } from '@/lib/context';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +17,9 @@ const desktopLinks = [
 export function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
-  const { state } = useApp();
+  const { state, catalog } = useApp();
+  const audiences = catalog?.audiences ?? [];
+  const categories = catalog?.categories ?? [];
   const [query, setQuery] = useState('');
 
   const submitSearch = (event: FormEvent) => {
@@ -77,7 +79,7 @@ export function SiteHeader() {
         aria-label="Разделы каталога"
         className="mx-auto max-w-6xl px-4 flex items-center gap-1 overflow-x-auto md:overflow-visible [scrollbar-width:none]"
       >
-        {audienceOptions.map((audience) => (
+        {audiences.map(({ code: audience }) => (
           <div key={audience} className="group relative shrink-0">
             <Link
               href={catalogHref({ audience })}
@@ -87,31 +89,35 @@ export function SiteHeader() {
             </Link>
             {/* Category list on hover; desktop only, phones go straight to the catalog. */}
             <div className="absolute left-0 top-full z-50 hidden w-56 rounded-b-lg border border-gray-200 bg-white py-2 shadow-lg md:group-hover:block md:group-focus-within:block">
-              {categoriesFor(audience).map((category) => (
-                <Link
-                  key={category.value}
-                  href={catalogHref({ audience, category: category.value })}
-                  className="flex items-center justify-between px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  {category.label}
-                  <span className="text-xs text-gray-400">{category.count}</span>
-                </Link>
-              ))}
+              {categories.flatMap((category) => {
+                const count = category.by_audience.find((entry) => entry.audience === audience);
+                if (!count) return [];
+                return (
+                  <Link
+                    key={category.code}
+                    href={catalogHref({ audience, category: category.code })}
+                    className="flex items-center justify-between px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    {category.name}
+                    <span className="text-xs text-gray-400">{count.count}</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         ))}
-        <span className="mx-1 h-4 w-px shrink-0 bg-gray-300" aria-hidden />
-        {categoriesFor(ALL)
-          .slice(0, 6)
-          .map((category) => (
-            <Link
-              key={category.value}
-              href={catalogHref({ category: category.value })}
-              className="shrink-0 px-3 py-2.5 text-sm text-gray-600 border-b-2 border-transparent hover:border-gray-400 hover:text-gray-900"
-            >
-              {category.label}
-            </Link>
-          ))}
+        {audiences.length > 0 && (
+          <span className="mx-1 h-4 w-px shrink-0 bg-gray-300" aria-hidden />
+        )}
+        {categories.slice(0, 6).map((category) => (
+          <Link
+            key={category.code}
+            href={catalogHref({ category: category.code })}
+            className="shrink-0 px-3 py-2.5 text-sm text-gray-600 border-b-2 border-transparent hover:border-gray-400 hover:text-gray-900"
+          >
+            {category.name}
+          </Link>
+        ))}
         <Link
           href="/catalog"
           className="shrink-0 px-3 py-2.5 text-sm text-gray-600 border-b-2 border-transparent hover:border-gray-400 hover:text-gray-900"

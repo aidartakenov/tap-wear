@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Heart } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { formatPrice, getStore } from '@/lib/catalog';
+import { formatPrice } from '@/lib/catalog';
 import { Product } from '@/lib/types';
 import { useApp } from '@/lib/context';
 
@@ -15,20 +15,21 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const { isFavorite, toggleFavorite } = useApp();
   const favorite = isFavorite(product.id);
-  const store = getStore(product.storeId);
 
   return (
     <Link href={`/products/${product.id}`}>
       <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-full">
         <CardContent className="p-0">
           <div className="relative aspect-[3/4] bg-gray-100">
-            <Image
-              src={product.images[0]}
-              alt={product.title}
-              fill
-              sizes="(max-width: 768px) 50vw, 25vw"
-              className="object-cover"
-            />
+            {product.image_url && (
+              <Image
+                src={product.image_url}
+                alt={product.title}
+                fill
+                sizes="(max-width: 768px) 50vw, 25vw"
+                className="object-cover"
+              />
+            )}
             <button
               aria-label={favorite ? 'Убрать из избранного' : 'Добавить в избранное'}
               onClick={(e) => {
@@ -43,18 +44,25 @@ export function ProductCard({ product }: ProductCardProps) {
                 }`}
               />
             </button>
+            {product.availability === 'out_of_stock' && (
+              <span className="absolute bottom-2 left-2 rounded-full bg-gray-900/80 px-2 py-0.5 text-xs font-medium text-white">
+                Нет в наличии
+              </span>
+            )}
           </div>
           <div className="p-3">
             <h3 className="font-medium text-sm text-gray-900 mb-1 line-clamp-2">
               {product.title}
             </h3>
-            {store && <p className="text-xs text-gray-500 mb-1 truncate">{store.name}</p>}
+            <p className="text-xs text-gray-500 mb-1 truncate">{product.store.name}</p>
             {product.sizes.length > 0 && (
               <p className="text-xs text-gray-600 mb-2 truncate">
                 Размеры: {product.sizes.join(', ')}
               </p>
             )}
-            <p className="font-bold text-sm text-gray-900">{formatPrice(product.priceMinor)}</p>
+            <p className="font-bold text-sm text-gray-900">
+              {formatPrice(product.price_minor, product.price_varies)}
+            </p>
           </div>
         </CardContent>
       </Card>

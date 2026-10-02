@@ -2,10 +2,15 @@
 
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { DemoNotice } from '@/components/DemoNotice';
+import { ErrorState, Loading } from '@/components/PageState';
 import { StoreCard } from '@/components/StoreCard';
-import { isDemoCatalog, stores } from '@/lib/catalog';
+import { getStores } from '@/lib/api';
+import { useApi } from '@/lib/useApi';
 
 export default function StoresPage() {
+  const { data, error, loading } = useApi((signal) => getStores(signal), []);
+  const stores = data?.items ?? [];
+
   return (
     <div className="min-h-screen pb-24 md:pb-12">
       <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
@@ -15,12 +20,20 @@ export default function StoresPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-4 space-y-3">
-        <div className="grid gap-3 md:grid-cols-2">
-          {stores.map((store) => (
-            <StoreCard key={store.id} store={store} />
-          ))}
-        </div>
-        {isDemoCatalog && <DemoNotice />}
+        {error ? (
+          <ErrorState error={error} />
+        ) : loading ? (
+          <Loading />
+        ) : stores.length === 0 ? (
+          <p className="py-16 text-center text-gray-500">Пока нет подключённых магазинов.</p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {stores.map((store) => (
+              <StoreCard key={store.id} store={store} />
+            ))}
+          </div>
+        )}
+        {stores.some((store) => store.is_demo) && <DemoNotice />}
       </main>
 
       <BottomNavigation />

@@ -5,14 +5,18 @@ from pydantic import ValidationError
 from app.config import Settings
 from app.main import app
 
-client = TestClient(app)
-
 
 def test_health_is_ok_without_a_database():
-    response = client.get("/api/v1/health")
+    response = TestClient(app).get("/api/v1/health")
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_readiness_reports_database_and_pgvector(client):
+    response = client.get("/api/v1/health/ready")
+
+    assert response.json()["database"] is True
 
 
 def test_settings_reject_a_non_asyncpg_database_url():

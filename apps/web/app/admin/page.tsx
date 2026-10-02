@@ -1,0 +1,188 @@
+'use client';
+
+import { useState } from 'react';
+import Image from 'next/image';
+import { BottomNavigation } from '@/components/BottomNavigation';
+import {
+  FormError,
+  dangerButton,
+  inputClass,
+  primaryButton,
+  secondaryButton,
+} from '@/components/form';
+import { ErrorState, Loading } from '@/components/PageState';
+import { RequireAccount } from '@/components/RequireAccount';
+import { decide, getReports, getReviewQueue, resolveReport } from '@/lib/api';
+import { audienceLabels, formatPrice, reportReasonLabels } from '@/lib/catalog';
+import { Decision } from '@/lib/types';
+import { useApi } from '@/lib/useApi';
+
+// Approve, or reject / block with a reason. Calls onDone once the decision is saved.
+function DecisionBar({
+  target,
+  id,
+  onDone,
+}: {
+  target: 'stores' | 'products';
+  id: string;
+  onDone: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+
+  const send = async (decision: Decision) => {
+    if (decision !== 'approve' && !reason.trim()) {
+      setError(null);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await decide(target, id, decision, reason.trim() || undefined);
+      onDone();
+    } catch (cause) {
+      setError(cause);
+      setBusy(false);
+    }
+  };
+
+  const needsReason = !reason.trim();
+  return (
+    <div className="space-y-2 border-t border-gray-100 pt-3">
+      <input
+        className={inputClass}
+        value={reason}
+        onChange={(event) => setReason(event.target.value)}
+        placeholder="Причина (обязательна для отказа и блокировки)"
+        maxLength={1000}
+      />
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => send('approve')} disabled={busy} className={primaryButton}>
+          Одобрить
+        </button>
+        <button onClick={() => send('reject')} disabled={busy || needsReason} className={secondaryButton}>
+          Вернуть на доработку
+        </button>
+        <button onClick={() => send('block')} disabled={busy || needsReason} className={dangerButton}>
+          Заблокировать
+        </button>
+      </div>
+      <FormError error={error} />
+    </div>
+  );
+}
+
+function Moderation() {
+  const [refresh, setRefresh] = useState(0);
+  const { data, error, loading } = useApi(
+    async (signal) => {
+      const [queue, reports] = await Promise.all([getReviewQueue(signal), getReports(signal)]);
+      return { queue, reports };
+    },
+    [refresh]
+  );
+  const [resolutions, setResolutions] = useState<Record<string, string>>({});
+  const reload = () => setRefresh((value) => value + 1);
+
+  if (error) return <ErrorState error={error} />;
+  if (!data) return <Loading />;
+  const { queue, reports } = data;
+
+  return (
+    <div className={`space-y-8 ${loading ? 'opacity-60' : ''}`}>
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold text-gray-900">Магазины на проверке: {queue.stores.length}</h2>
+        {queue.stores.map((store) => (
+          <article key={store.id} className="space-y-2 rounded-xl border border-gray-200 bg-white p-4">
+            <h3 className="font-semibold text-gray-900">{store.name}</h3>
+            {store.description && <p className="text-sm text-gray-700">{store.description}</p>}
+            <p className="text-sm text-gray-600">
+              {[store.address, store.phone, store.instagram && `@${store.instagram}`, store.website]
+                .filter(Boolean)
+                .join(' · ') || 'Контакты не указаны'}
+            </p>
+            <DecisionBar target="stores" id={store.id} onDone={reload} />
+          </article>
+        ))}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold text-gray-900">Товары на проверке: {queue.products.length}</h2>
+        {queue.products.map((product) => (
+          <article key={product.id} className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">{product.title}</h3>
+              <p className="text-sm text-gray-600">
+                {product.store_name} · {product.category} · {audienceLabels[product.audience]} ·{' '}
+                {formatPrice(product.base_price_minor)} · вариантов: {product.variant_count}
+              </p>
+            </div>
+            <div className="flex gap-2 overflow-x-auto">
+              {product.images.map((image) => (
+                <div key={image} className="relative h-40 w-32 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                  <Image src={image} alt="" fill sizes="128px" className="object-cover" />
+                </div>
+              ))}
+            </div>
+            {product.description && (
+              <p className="text-sm text-gray-700 whitespace-pre-line">{product.description}</p>
+            )}
+            <DecisionBar target="products" id={product.id} onDone={reload} />
+          </article>
+        ))}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold text-gray-900">Жалобы покупателей: {reports.length}</h2>
+        {reports.map((report) => (
+          <article key={report.id} className="space-y-2 rounded-xl border border-gray-200 bg-white p-4">
+            <p className="font-semibold text-gray-900">{reportReasonLabels[report.reason]}</p>
+            <p className="text-sm text-gray-600">
+              <a href={`/products/${report.product_id}`} className="text-blue-600 hover:underline">
+                {report.product_title}
+              </a>{' '}
+              · {report.store_name}
+            </p>
+            {report.comment && <p className="text-sm text-gray-700">«{report.comment}»</p>}
+            <div className="flex gap-2">
+              <input
+                className={inputClass}
+                value={resolutions[report.id] ?? ''}
+                onChange={(event) => setResolutions({ ...resolutions, [report.id]: event.target.value })}
+                placeholder="Что сделано"
+                maxLength={1000}
+              />
+              <button
+                onClick={async () => {
+                  await resolveReport(report.id, resolutions[report.id]);
+                  reload();
+                }}
+                disabled={!resolutions[report.id]?.trim()}
+                className={`${primaryButton} shrink-0`}
+              >
+                Закрыть
+              </button>
+            </div>
+          </article>
+        ))}
+      </section>
+    </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <div className="min-h-screen pb-24 md:pb-12">
+      <header className="bg-white sticky top-0 z-40 border-b border-gray-200">
+        <div className="mx-auto max-w-3xl px-4 py-3">
+          <h1 className="text-xl font-bold text-gray-900">Модерация</h1>
+        </div>
+      </header>
+      <main className="mx-auto max-w-3xl px-4 py-4">
+        <RequireAccount admin>{() => <Moderation />}</RequireAccount>
+      </main>
+      <BottomNavigation />
+    </div>
+  );
+}

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { VisualSearchModal } from '@/components/VisualSearchModal';
 import { ProductCard } from '@/components/ProductCard';
-import { products } from '@/lib/catalog';
+import { getProducts } from '@/lib/api';
 import { Product } from '@/lib/types';
 
 export default function SearchPage() {
@@ -14,14 +14,15 @@ export default function SearchPage() {
 
   const handleSearch = () => {
     setIsSearching(true);
-    // Simulate search delay
-    setTimeout(() => {
-      // Placeholder until the visual search API exists: a random sample of the catalog.
-      const results = [...products].sort(() => Math.random() - 0.5).slice(0, 6);
-      setSearchResults(results);
-      setIsSearching(false);
-      setIsModalOpen(false);
-    }, 2000);
+    // Placeholder until the visual search API exists: a random sample of the catalog.
+    getProducts({ limit: 60 })
+      .then((page) => [...page.items].sort(() => Math.random() - 0.5).slice(0, 6))
+      .catch(() => [])
+      .then((results) => {
+        setSearchResults(results);
+        setIsSearching(false);
+        setIsModalOpen(false);
+      });
   };
 
   return (

@@ -1,44 +1,35 @@
 'use client';
 
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { ChevronRight, Heart, LogOut, Shield, Store, User } from 'lucide-react';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { Loading } from '@/components/PageState';
+import { primaryButton, secondaryButton } from '@/components/form';
+import { plural, productForms } from '@/lib/catalog';
 import { useApp } from '@/lib/context';
-import { User, ShoppingBag, Store, Shield, LogOut, Settings } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+function Row({ href, icon: Icon, title, text }: { href: string; icon: typeof User; title: string; text: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md transition-shadow"
+    >
+      <span className="rounded-full bg-gray-100 p-2.5 text-gray-700">
+        <Icon className="w-5 h-5" />
+      </span>
+      <span className="flex-1">
+        <span className="block font-medium text-gray-900">{title}</span>
+        <span className="block text-sm text-gray-600">{text}</span>
+      </span>
+      <ChevronRight className="w-5 h-5 text-gray-400" />
+    </Link>
+  );
+}
 
 export default function ProfilePage() {
-  const { state, setUserRole } = useApp();
-
-  const roleConfig = {
-    guest: {
-      title: 'Гость',
-      description: 'Войдите в аккаунт для полного доступа',
-      icon: User,
-      color: 'text-gray-600',
-    },
-    buyer: {
-      title: 'Покупатель',
-      description: 'Добро пожаловать!',
-      icon: ShoppingBag,
-      color: 'text-blue-600',
-    },
-    store_owner: {
-      title: 'Продавец',
-      description: 'Управляйте своим магазином',
-      icon: Store,
-      color: 'text-green-600',
-    },
-    admin: {
-      title: 'Администратор',
-      description: 'Полный доступ к системе',
-      icon: Shield,
-      color: 'text-purple-600',
-    },
-  };
-
-  const currentRole = roleConfig[state.userRole];
-  const RoleIcon = currentRole.icon;
+  const router = useRouter();
+  const { me, signOut, state } = useApp();
 
   return (
     <div className="min-h-screen pb-24 md:pb-12">
@@ -48,133 +39,75 @@ export default function ProfilePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-4 space-y-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className={`p-3 bg-gray-100 rounded-full ${currentRole.color}`}>
-                <RoleIcon className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="font-semibold text-gray-900">{currentRole.title}</h2>
-                <p className="text-sm text-gray-600">{currentRole.description}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <main className="mx-auto max-w-2xl px-4 py-4 space-y-3">
+        {me === undefined ? (
+          <Loading />
+        ) : (
+          <>
+            <section className="rounded-xl border border-gray-200 bg-white p-4">
+              {me ? (
+                <div className="flex items-center gap-3">
+                  <span className="rounded-full bg-blue-50 p-3 text-blue-600">
+                    <User className="w-6 h-6" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{me.name}</p>
+                    <p className="text-sm text-gray-600 truncate">{me.email}</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="font-semibold text-gray-900">Вы смотрите каталог как гость</p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Искать, смотреть товары и сохранять избранное можно без регистрации. Аккаунт
+                    нужен владельцам и сотрудникам магазинов.
+                  </p>
+                  <Link href="/login" className={`${primaryButton} mt-4`}>
+                    Вход для магазинов
+                  </Link>
+                </>
+              )}
+            </section>
 
-        {state.userRole === 'guest' && (
-          <Card>
-            <CardContent className="p-4">
-              <Button className="w-full" size="lg">
-                Войти в аккаунт
-              </Button>
-            </CardContent>
-          </Card>
+            <Row
+              href="/favorites"
+              icon={Heart}
+              title="Избранное"
+              text={
+                state.favorites.length
+                  ? `Сохранено на этом устройстве: ${plural(state.favorites.length, productForms)}`
+                  : 'Сохраняется на этом устройстве'
+              }
+            />
+            {me && (
+              <Row
+                href="/cabinet"
+                icon={Store}
+                title="Кабинет магазина"
+                text={
+                  me.memberships.length
+                    ? me.memberships.map((m) => m.store_name).join(', ')
+                    : 'Создайте магазин и добавьте товары'
+                }
+              />
+            )}
+            {me?.is_admin && (
+              <Row href="/admin" icon={Shield} title="Модерация" text="Проверка магазинов, товаров и жалоб" />
+            )}
+            {me && (
+              <button
+                onClick={async () => {
+                  await signOut();
+                  router.push('/');
+                }}
+                className={`${secondaryButton} w-full`}
+              >
+                <LogOut className="w-4 h-4" />
+                Выйти
+              </button>
+            )}
+          </>
         )}
-
-        {state.userRole === 'buyer' && (
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600">Заказы</span>
-                <span className="font-medium">5</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600">Избранное</span>
-                <span className="font-medium">12</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-gray-600">Адрес доставки</span>
-                <span className="font-medium text-sm text-gray-500">Не указан</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {state.userRole === 'store_owner' && (
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600">Мой магазин</span>
-                <span className="font-medium text-sm text-blue-600">Elegance Fashion</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600">Товары</span>
-                <span className="font-medium">48</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600">Продажи за месяц</span>
-                <span className="font-medium">24 500 сом</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-gray-600">Рейтинг</span>
-                <span className="font-medium">4.8 ⭐</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {state.userRole === 'admin' && (
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600">Пользователи</span>
-                <span className="font-medium">1,234</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600">Магазины</span>
-                <span className="font-medium">156</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600">Товары</span>
-                <span className="font-medium">8,432</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-gray-600">Жалобы</span>
-                <span className="font-medium text-red-600">3</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardContent className="p-4">
-            <Button variant="ghost" className="w-full justify-start">
-              <Settings className="w-4 h-4 mr-2" />
-              Настройки
-            </Button>
-            <Button variant="ghost" className="w-full justify-start text-red-600">
-              <LogOut className="w-4 h-4 mr-2" />
-              Выйти
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Демо: переключить роль</h3>
-            <Tabs defaultValue="guest" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="guest" onClick={() => setUserRole('guest')}>
-                  Гость
-                </TabsTrigger>
-                <TabsTrigger value="buyer" onClick={() => setUserRole('buyer')}>
-                  Покупатель
-                </TabsTrigger>
-                <TabsTrigger
-                  value="store_owner"
-                  onClick={() => setUserRole('store_owner')}
-                >
-                  Продавец
-                </TabsTrigger>
-                <TabsTrigger value="admin" onClick={() => setUserRole('admin')}>
-                  Админ
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardContent>
-        </Card>
       </main>
 
       <BottomNavigation />
