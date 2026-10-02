@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     login_max_failures: int = Field(default=5, gt=0)
     login_lock_minutes: int = Field(default=15, gt=0)
 
+    # Stock freshness: hours after the last confirmation at which the seller is
+    # reminded, and at which buyers stop being told "in stock".
+    availability_reminder_hours: int = Field(default=48, gt=0)
+    availability_stale_hours: int = Field(default=72, gt=0)
+
     # Database. Required: there is deliberately no default, so a missing
     # DATABASE_URL fails at startup instead of falling back to a baked-in credential.
     database_url: PostgresDsn

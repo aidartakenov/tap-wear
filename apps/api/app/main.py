@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import health
 from app.accounts.me_router import router as me_router
 from app.accounts.router import router as auth_router
+from app.analytics.router import analytics_router, events_router
 from app.catalog.router import router as catalog_router
 from app.config import get_settings
 from app.database import engine
@@ -51,6 +52,8 @@ for router in (
     auth_router,
     me_router,
     merchant_router,
+    analytics_router,
+    events_router,
     admin_router,
     reports_router,
     reference_router,

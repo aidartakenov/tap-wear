@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, ChevronRight, Heart } from 'lucide-react';
@@ -10,6 +10,7 @@ import { ContactButton } from '@/components/ContactButton';
 import { DemoNotice } from '@/components/DemoNotice';
 import { ErrorState, Loading } from '@/components/PageState';
 import { ReportProblem } from '@/components/ReportProblem';
+import { track } from '@/lib/analytics';
 import { getProduct } from '@/lib/api';
 import { audienceLabels, availabilityLabels, formatPrice, sizeSystemLabel } from '@/lib/catalog';
 import { useApp } from '@/lib/context';
@@ -43,6 +44,11 @@ function ProductView({ product }: { product: ProductDetail }) {
   );
   const selected: Variant | undefined = product.variants.find((v) => v.id === selectedId);
   const sizeSystem = sizeSystemLabel(product.size_system);
+
+  // One view per opened product page, for the store's statistics.
+  useEffect(() => {
+    track('product_view', { product_id: product.id });
+  }, [product.id]);
   const availability = selected?.availability ?? product.availability;
 
   return (
@@ -178,6 +184,8 @@ function ProductView({ product }: { product: ProductDetail }) {
             size: selected?.size_label ?? null,
             color: selected?.color?.name ?? null,
             url: product.source_url,
+            productId: product.id,
+            variantId: selected?.id ?? null,
           }}
         />
 

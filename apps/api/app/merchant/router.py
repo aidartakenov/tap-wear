@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import storage
 from app.accounts.deps import CurrentUser
 from app.accounts.models import User
+from app.catalog.availability import Confirmation, confirmation_state, set_availability
 from app.catalog.models import (
     Availability,
     Product,
@@ -147,6 +148,11 @@ def product_out(product: Product) -> MerchantProductOut:
                 availability=variant.availability_status,
                 quantity=variant.quantity,
                 availability_confirmed_at=variant.availability_confirmed_at,
+                confirmation=(
+                    confirmation_state(variant)
+                    if variant.availability_status == Availability.IN_STOCK
+                    else Confirmation.FRESH
+                ),
             )
             for variant in product.variants
         ],
@@ -296,11 +302,10 @@ async def apply_variants(db: AsyncSession, product: Product, incoming: list[Vari
         variant.stock_mode = StockMode.EXACT if item.quantity is not None else StockMode.MANUAL
         # With exact stock the status follows the quantity.
         if item.quantity is not None:
-            variant.availability_status = (
-                Availability.IN_STOCK if item.quantity > 0 else Availability.OUT_OF_STOCK
-            )
+            status = Availability.IN_STOCK if item.quantity > 0 else Availability.OUT_OF_STOCK
         else:
-            variant.availability_status = item.availability
+            status = item.availability
+        set_availability(variant, status)
         variant.position = position
         kept.append(variant)
     product.variants = kept
@@ -524,6 +529,19 @@ async def copy_product(product_id: uuid.UUID, user: CurrentUser, db: Db) -> Merc
     return await commit_product(db, copy.id)
 
 
+@router.post("/products/{product_id}/confirm-availability")
+async def confirm_product_availability(
+    product_id: uuid.UUID, user: CurrentUser, db: Db
+) -> MerchantProductOut:
+    """The seller confirms that the stock status of every variant is still correct."""
+    product = await product_for(db, user, product_id, lock=True)
+    ensure_editable(product)
+    now = datetime.now(UTC)
+    for variant in product.variants:
+        variant.availability_confirmed_at = now
+    return await commit_product(db, product.id)
+
+
 @router.patch("/variants/{variant_id}")
 async def update_variant(
     variant_id: uuid.UUID, body: VariantUpdate, user: CurrentUser, db: Db
@@ -536,12 +554,12 @@ async def update_variant(
     if body.quantity is not None:
         variant.quantity = body.quantity
         variant.stock_mode = StockMode.EXACT
-        variant.availability_status = (
-            Availability.IN_STOCK if body.quantity > 0 else Availability.OUT_OF_STOCK
+        set_availability(
+            variant, Availability.IN_STOCK if body.quantity > 0 else Availability.OUT_OF_STOCK
         )
     elif body.availability is not None:
-        variant.availability_status = body.availability
-    # confirmed_at moves only on an explicit confirmation, not on every edit.
+        set_availability(variant, body.availability)
+    # Otherwise the confirmation time moves only when the seller confirms explicitly.
     if body.confirm_availability:
         variant.availability_confirmed_at = datetime.now(UTC)
     return await commit_product(db, variant.product_id)

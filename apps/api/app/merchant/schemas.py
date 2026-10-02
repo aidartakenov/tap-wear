@@ -4,6 +4,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
+from app.catalog.availability import Confirmation
 from app.catalog.models import Audience, Availability, ProductStatus
 from app.catalog.schemas import CategoryOut, ColorOut
 from app.stores.models import MemberRole, StoreStatus
@@ -124,6 +125,9 @@ class MerchantVariantOut(BaseModel):
     availability: Availability
     quantity: int | None
     availability_confirmed_at: datetime | None
+    # For "in stock" variants: whether the confirmation is fresh, due for a
+    # reminder, or so old that buyers no longer see "in stock".
+    confirmation: Confirmation
 
 
 class MerchantImageOut(BaseModel):

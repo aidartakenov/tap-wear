@@ -86,6 +86,12 @@ Requirements: Docker Desktop, Python 3.11+, [uv](https://docs.astral.sh/uv/), No
 
 Sessions use an HttpOnly cookie; every changing request must also carry the session's CSRF token in the `X-CSRF-Token` header (the web app does this automatically).
 
+## Stock freshness and statistics
+
+- **Freshness:** a variant marked "in stock" is shown to buyers as in stock only while its confirmation is recent. After `AVAILABILITY_REMINDER_HOURS` (48) the seller sees a reminder in the cabinet; after `AVAILABILITY_STALE_HOURS` (72) buyers see "availability needs checking" and the variant no longer matches the "in stock" filter, until the seller confirms it. Setting a new stock status counts as a confirmation; other edits do not.
+- **Events:** the web app reports product views, storefront views and contact clicks to `POST /events`. No personal data is stored: the visitor is a random id from the browser, and no IP address or search text is kept. A link can carry `?source=instagram` (or `utm_source`) so the store can see where visitors came from.
+- **Statistics:** each store's members see views, visitors, contact clicks, sources and top products for 7 or 30 days in the cabinet. A contact click is an inquiry, not a sale.
+
 ## Checks
 
 From `apps/api` (the tests use a separate `tapwear_test` database and a separate `tapwear-test-assets` bucket; the ones that need Postgres or object storage are skipped if it is not running):

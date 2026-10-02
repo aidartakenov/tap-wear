@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft, Check, Plus, Trash2 } from 'lucide-react';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { StoreForm } from '@/components/cabinet/StoreForm';
+import { StoreStatistics } from '@/components/cabinet/StoreStatistics';
 import {
   FormError,
   StatusBadge,
@@ -19,6 +20,7 @@ import { ErrorState, Loading } from '@/components/PageState';
 import { RequireAccount } from '@/components/RequireAccount';
 import {
   addMember,
+  confirmProductAvailability,
   getMembers,
   getMyProducts,
   getMyStores,
@@ -36,7 +38,7 @@ import {
 import { Availability, Member, MerchantProduct, MerchantStore, Reference } from '@/lib/types';
 import { useApi } from '@/lib/useApi';
 
-type Tab = 'products' | 'profile' | 'members';
+type Tab = 'products' | 'statistics' | 'profile' | 'members';
 
 const availabilityShort: Record<Availability, string> = {
   in_stock: 'Есть',
@@ -57,6 +59,21 @@ function ProductRow({ initial }: { initial: MerchantProduct }) {
     setError(null);
     try {
       setProduct(await updateVariant(variantId, { availability, confirm_availability: true }));
+    } catch (cause) {
+      setError(errorText(cause));
+    }
+  };
+
+  // "In stock" that has not been confirmed for a while: after 2 days the seller is
+  // reminded, after 3 days buyers stop seeing "in stock" until it is confirmed.
+  const inStock = product.variants.filter((variant) => variant.availability === 'in_stock');
+  const stale = inStock.filter((variant) => variant.confirmation === 'stale').length;
+  const due = inStock.filter((variant) => variant.confirmation === 'due').length;
+
+  const confirmAll = async () => {
+    setError(null);
+    try {
+      setProduct(await confirmProductAvailability(product.id));
     } catch (cause) {
       setError(errorText(cause));
     }
@@ -112,6 +129,21 @@ function ProductRow({ initial }: { initial: MerchantProduct }) {
             </li>
           ))}
         </ul>
+      )}
+      {(stale > 0 || due > 0) && product.status !== 'blocked' && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <span>
+            {stale > 0
+              ? 'Наличие давно не подтверждалось: покупатели видят «Требует уточнения».'
+              : 'Наличие не подтверждалось больше двух дней.'}
+          </span>
+          <button
+            onClick={confirmAll}
+            className="rounded-md bg-amber-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800"
+          >
+            Всё по-прежнему в наличии
+          </button>
+        </div>
       )}
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
     </li>
@@ -260,8 +292,9 @@ function StoreCabinet({ storeId }: { storeId: string }) {
         )}
       </div>
 
-      <div className="flex gap-5 border-b border-gray-200">
+      <div className="flex gap-5 overflow-x-auto border-b border-gray-200 whitespace-nowrap">
         {tabButton('products', `Товары (${data.products.length})`)}
+        {tabButton('statistics', 'Статистика')}
         {tabButton('profile', 'Профиль магазина')}
         {tabButton('members', 'Сотрудники')}
       </div>
@@ -291,6 +324,8 @@ function StoreCabinet({ storeId }: { storeId: string }) {
           )}
         </section>
       )}
+
+      {tab === 'statistics' && <StoreStatistics storeId={store.id} />}
 
       {tab === 'profile' &&
         (store.role === 'owner' ? (

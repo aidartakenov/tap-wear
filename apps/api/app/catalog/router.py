@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import storage
+from app.catalog.availability import effective_availability
 from app.catalog.models import Audience, Availability, Product, ProductImage, ProductVariant
 from app.catalog.queries import (
     EFFECTIVE_PRICE,
@@ -44,7 +45,7 @@ def image_url(image: ProductImage) -> str | None:
 
 
 def overall_availability(variants: list[ProductVariant]) -> Availability:
-    statuses = {variant.availability_status for variant in variants}
+    statuses = {effective_availability(variant) for variant in variants}
     if Availability.IN_STOCK in statuses:
         return Availability.IN_STOCK
     # Without confirmed stock the product is "needs checking", never "in stock".
@@ -57,7 +58,7 @@ def list_item_fields(product: Product, price_minor: int, price_varies: bool) -> 
     available = [
         variant
         for variant in product.variants
-        if variant.availability_status != Availability.OUT_OF_STOCK
+        if effective_availability(variant) != Availability.OUT_OF_STOCK
     ]
     colors = {
         variant.color.code: ColorOut(code=variant.color.code, name=variant.color.name_ru)
@@ -163,7 +164,7 @@ async def get_product_detail(
                     else None
                 ),
                 price_minor=variant.price_override_minor or product.base_price_minor,
-                availability=variant.availability_status,
+                availability=effective_availability(variant),
                 availability_confirmed_at=variant.availability_confirmed_at,
             )
             for variant in product.variants

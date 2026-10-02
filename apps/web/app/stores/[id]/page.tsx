@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Clock, MapPin, Phone, Search } from 'lucide-react';
@@ -11,6 +11,7 @@ import { ErrorState, Loading } from '@/components/PageState';
 import { ProductCard } from '@/components/ProductCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { track } from '@/lib/analytics';
 import { getProducts, getStore } from '@/lib/api';
 import { catalogHref, plural, productForms } from '@/lib/catalog';
 import { useApi } from '@/lib/useApi';
@@ -22,6 +23,11 @@ export default function StoreProfilePage() {
   const slug = String(useParams().id);
   const router = useRouter();
   const [query, setQuery] = useState('');
+
+  // One view per opened storefront, for the store's statistics.
+  useEffect(() => {
+    track('store_view', { store_slug: slug });
+  }, [slug]);
 
   // Search starts inside this store; the catalog page offers to widen it to all stores.
   const searchInStore = (event: FormEvent) => {

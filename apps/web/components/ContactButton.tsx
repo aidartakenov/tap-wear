@@ -1,6 +1,7 @@
 'use client';
 
 import { ExternalLink, MessageCircle, Phone, Send } from 'lucide-react';
+import { ContactChannel, track } from '@/lib/analytics';
 import { formatPrice } from '@/lib/catalog';
 import { Store } from '@/lib/types';
 
@@ -13,6 +14,8 @@ interface ContactButtonProps {
     size: string | null;
     color: string | null;
     url: string | null;
+    productId: string;
+    variantId: string | null;
   };
 }
 
@@ -37,6 +40,15 @@ export function ContactButton({ store, inquiry }: ContactButtonProps) {
     : 'Здравствуйте! Пишу вам с TapWear.';
   const link = inquiry?.url ?? store.website;
 
+  // Counted for the store's statistics. A click is an inquiry, not a sale.
+  const clicked = (channel: ContactChannel) => () =>
+    track(
+      'contact_click',
+      inquiry
+        ? { product_id: inquiry.productId, variant_id: inquiry.variantId ?? undefined, channel }
+        : { store_slug: store.slug, channel }
+    );
+
   return (
     <div className="space-y-2">
       {store.whatsapp ? (
@@ -44,6 +56,7 @@ export function ContactButton({ store, inquiry }: ContactButtonProps) {
           href={`https://wa.me/${store.whatsapp}?text=${encodeURIComponent(message)}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={clicked('whatsapp')}
           className={primary}
         >
           <MessageCircle className="w-4 h-4 mr-2" />
@@ -51,7 +64,11 @@ export function ContactButton({ store, inquiry }: ContactButtonProps) {
         </a>
       ) : (
         store.phone && (
-          <a href={`tel:${store.phone.replace(/[^\d+]/g, '')}`} className={primary}>
+          <a
+            href={`tel:${store.phone.replace(/[^\d+]/g, '')}`}
+            onClick={clicked('phone')}
+            className={primary}
+          >
             <Phone className="w-4 h-4 mr-2" />
             Позвонить {store.phone}
           </a>
@@ -62,6 +79,7 @@ export function ContactButton({ store, inquiry }: ContactButtonProps) {
           href={`https://instagram.com/${store.instagram}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={clicked('instagram')}
           className={secondary}
         >
           <Send className="w-4 h-4 mr-2" />
@@ -69,7 +87,13 @@ export function ContactButton({ store, inquiry }: ContactButtonProps) {
         </a>
       )}
       {link && (
-        <a href={link} target="_blank" rel="noopener noreferrer" className={secondary}>
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={clicked('website')}
+          className={secondary}
+        >
           <ExternalLink className="w-4 h-4 mr-2" />
           {inquiry ? 'Открыть на сайте магазина' : 'Сайт магазина'}
         </a>

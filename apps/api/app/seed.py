@@ -11,6 +11,7 @@ import asyncio
 import json
 import sys
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import delete, select
@@ -53,6 +54,7 @@ def demo_uuid(*parts: object) -> uuid.UUID:
 
 async def seed(path: Path) -> None:
     catalog = json.loads(path.read_text())
+    generated_at = datetime.fromisoformat(catalog["generatedAt"])
 
     async with SessionLocal() as session:
         for name, code in CITIES.items():
@@ -127,6 +129,8 @@ async def seed(path: Path) -> None:
                         size_label=size,
                         color_code=color_code,
                         availability_status=Availability(item["availability"]),
+                        # The store's site showed this stock when the file was generated.
+                        availability_confirmed_at=generated_at,
                         position=position,
                     )
                 )

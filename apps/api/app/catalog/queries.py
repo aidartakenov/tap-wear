@@ -11,7 +11,8 @@ from sqlalchemy import Select, and_, distinct, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.catalog.models import Availability, Product, ProductStatus, ProductVariant
+from app.catalog.availability import confirmed_in_stock
+from app.catalog.models import Product, ProductStatus, ProductVariant
 from app.errors import ApiError
 from app.reference.models import Category
 from app.stores.models import Store, StoreStatus
@@ -92,7 +93,7 @@ def matching_variants(filters: ProductFilter) -> Select:
     if filters.color:
         conditions.append(ProductVariant.color_code == filters.color)
     if filters.in_stock:
-        conditions.append(ProductVariant.availability_status == Availability.IN_STOCK)
+        conditions.append(confirmed_in_stock())
     if filters.price_min_minor is not None:
         conditions.append(EFFECTIVE_PRICE >= filters.price_min_minor)
     if filters.price_max_minor is not None:

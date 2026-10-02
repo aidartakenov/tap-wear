@@ -333,13 +333,21 @@ def test_editing_variants_keeps_updates_adds_and_removes(owner, store):
     assert medium["id"] not in {v["id"] for v in updated["variants"]}
 
 
-def test_quick_stock_update_confirms_only_when_asked(owner, store):
+def test_confirmation_time_moves_on_a_new_status_or_explicit_confirmation_only(owner, store):
     product = new_product(owner, store["id"])
     variant_id = product["variants"][0]["id"]
+    created_at = product["variants"][0]["availability_confirmed_at"]
+    # Stating "in stock" when creating the variant counts as confirming it.
+    assert created_at is not None
+
+    repriced = owner.patch(
+        f"/merchant/variants/{variant_id}", json={"price_override_minor": 4000 * SOM}
+    ).json()
+    assert repriced["variants"][0]["availability_confirmed_at"] == created_at
 
     changed = owner.patch(f"/merchant/variants/{variant_id}", json={"availability": "out_of_stock"})
     assert changed.json()["variants"][0]["availability"] == "out_of_stock"
-    assert changed.json()["variants"][0]["availability_confirmed_at"] is None
+    assert changed.json()["variants"][0]["availability_confirmed_at"] > created_at
 
     confirmed = owner.patch(
         f"/merchant/variants/{variant_id}",

@@ -15,6 +15,7 @@ import {
   ReportReason,
   ReviewQueue,
   Store,
+  StoreAnalytics,
   StoreInput,
   VariantInput,
 } from './types';
@@ -220,6 +221,15 @@ export const updateVariant = (
     confirm_availability?: boolean;
   }
 ) => send<MerchantProduct>('PATCH', `/merchant/variants/${id}`, change);
+
+export const confirmProductAvailability = (id: string) =>
+  send<MerchantProduct>('POST', `/merchant/products/${id}/confirm-availability`);
+export const getStoreAnalytics = (storeId: string, days: number, signal?: AbortSignal) =>
+  get<StoreAnalytics>(
+    '/merchant/analytics',
+    new URLSearchParams({ store_id: storeId, days: String(days) }),
+    signal
+  );
 
 export function uploadProductImage(productId: string, file: File) {
   const form = new FormData();

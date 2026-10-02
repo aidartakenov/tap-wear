@@ -181,6 +181,8 @@ export interface MerchantVariant extends Omit<VariantInput, 'color' | 'id'> {
   id: string;
   color: Color | null;
   availability_confirmed_at: string | null;
+  // For "in stock" variants: fresh, due for a reminder, or too old to be shown as in stock.
+  confirmation: 'fresh' | 'due' | 'stale';
 }
 
 export interface MerchantProduct {
@@ -261,4 +263,18 @@ export interface Report {
   status: 'open' | 'resolved';
   resolution: string | null;
   created_at: string;
+}
+
+export interface StoreAnalytics {
+  days: number;
+  store_views: number;
+  product_views: number;
+  visitors: number;
+  contact_clicks: number;
+  contacting_visitors: number;
+  contacts_by_channel: { key: string; count: number }[];
+  sources: { key: string; count: number }[];
+  top_products: { id: string; title: string; views: number; contacts: number }[];
+  daily: { date: string; product_views: number; contact_clicks: number }[];
+  freshness: { in_stock_variants: number; confirmed_recently: number; needs_confirmation: number };
 }

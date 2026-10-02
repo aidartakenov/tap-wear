@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import os
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -66,6 +67,8 @@ def variant(product: str, size: str | None, color: str | None, status: Availabil
         size_label=size,
         color_code=color,
         availability_status=status,
+        # In-stock fixtures were confirmed just now, unless a test says otherwise.
+        availability_confirmed_at=extra.pop("confirmed_at", datetime.now(UTC)),
         # Explicit order, so the size list in responses is deterministic.
         position=next(POSITIONS),
         **extra,
@@ -159,3 +162,21 @@ def client(database) -> TestClient:
     # One client for the whole run keeps the app's connection pool on one event loop.
     with TestClient(app) as test_client:
         yield test_client
+
+
+def make_member(email: str, store: str, role: str = "owner") -> None:
+    """Give a registered account access to a fixture store, directly in the database."""
+
+    async def insert() -> None:
+        engine = create_async_engine(test_url, poolclass=NullPool)
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO store_members (id, store_id, user_id, role) "
+                    "SELECT gen_random_uuid(), :store, id, :role FROM users WHERE email = :email"
+                ),
+                {"store": IDS[store], "role": role, "email": email},
+            )
+        await engine.dispose()
+
+    asyncio.run(insert())
