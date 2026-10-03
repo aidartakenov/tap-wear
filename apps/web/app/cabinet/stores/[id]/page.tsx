@@ -30,6 +30,7 @@ import {
   confirmProductAvailability,
   getMembers,
   setCabinetTheme,
+  setProductDiscount,
   getMyProduct,
   markSold,
   removeShopSale,
@@ -41,6 +42,8 @@ import {
   updateVariant,
 } from '@/lib/api';
 import {
+  DISCOUNT_CHOICES,
+  discountedPrice,
   formatPrice,
   productStatusLabels,
   storeStatusLabels,
@@ -87,6 +90,15 @@ function ProductRow({ initial, onSale }: { initial: MerchantProduct; onSale: () 
 
   // The sale recorded by the last tap, so it can be taken back at once.
   const [lastSale, setLastSale] = useState<{ id: string; name: string } | null>(null);
+
+  const discount = async (percent: number | null) => {
+    setError(null);
+    try {
+      setProduct(await setProductDiscount(product.id, product.version, percent));
+    } catch (cause) {
+      setError(errorText(cause));
+    }
+  };
 
   // "Есть": the size is in the shop again. One click, no form.
   const restock = async (variant: MerchantProduct['variants'][number]) => {
@@ -159,7 +171,40 @@ function ProductRow({ initial, onSale }: { initial: MerchantProduct; onSale: () 
           </Link>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
             <StatusBadge status={product.status} label={tr(productStatusLabels[product.status])} />
-            <span>{formatPrice(product.base_price_minor)}</span>
+            {product.discount_percent ? (
+              <span className="flex items-baseline gap-1.5">
+                <span className="font-semibold text-red-600">
+                  {formatPrice(discountedPrice(product.base_price_minor, product.discount_percent))}
+                </span>
+                <s className="text-xs text-gray-500">{formatPrice(product.base_price_minor)}</s>
+              </span>
+            ) : (
+              <span>{formatPrice(product.base_price_minor)}</span>
+            )}
+            {/* The discount, changed in one move from the list. */}
+            <select
+              value={product.discount_percent ?? ''}
+              onChange={(event) => discount(event.target.value ? Number(event.target.value) : null)}
+              aria-label={tr('Скидка')}
+              className={`h-10 rounded-full border px-3 text-sm font-semibold md:h-8 md:px-2.5 md:text-xs ${
+                product.discount_percent
+                  ? 'border-red-600 bg-red-600 text-white'
+                  : 'border-gray-300 bg-white text-gray-700'
+              }`}
+            >
+              <option value="">{tr('Без скидки')}</option>
+              {DISCOUNT_CHOICES.concat(
+                product.discount_percent && !DISCOUNT_CHOICES.includes(product.discount_percent)
+                  ? [product.discount_percent]
+                  : []
+              )
+                .sort((a, b) => a - b)
+                .map((percent) => (
+                  <option key={percent} value={percent}>
+                    {tr('Скидка −{n}%', { n: percent })}
+                  </option>
+                ))}
+            </select>
           </div>
           {product.review_note && (
             <p className="mt-1 text-sm text-red-700">
@@ -172,7 +217,7 @@ function ProductRow({ initial, onSale }: { initial: MerchantProduct; onSale: () 
       {product.variants.length > 0 && product.status !== 'blocked' && (
         <ul className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
           {product.variants.map((variant) => (
-            <li key={variant.id} className="flex items-center justify-between gap-2 text-sm">
+            <li key={variant.id} className="flex min-h-10 items-center justify-between gap-2 text-sm">
               <span className="text-gray-700">
                 {variantName(variant) || tr('Без размера')}
               </span>
@@ -180,7 +225,7 @@ function ProductRow({ initial, onSale }: { initial: MerchantProduct; onSale: () 
                 {variant.quantity !== null ? (
                   // A counted size: the number is the status, and it goes down by itself.
                   <span
-                    className={`min-w-14 rounded-md px-2 py-1 text-center text-xs font-medium ${
+                    className={`flex h-10 min-w-14 items-center justify-center rounded-lg px-2 text-sm font-medium md:h-auto md:rounded-md md:py-1 md:text-xs ${
                       variant.quantity > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'
                     }`}
                   >
@@ -190,7 +235,7 @@ function ProductRow({ initial, onSale }: { initial: MerchantProduct; onSale: () 
                   <button
                     onClick={() => restock(variant)}
                     aria-pressed={variant.availability === 'in_stock'}
-                    className={`rounded-md border px-2.5 py-1 text-xs font-medium ${
+                    className={`h-10 rounded-lg border px-3.5 text-sm font-medium md:h-auto md:rounded-md md:px-2.5 md:py-1 md:text-xs ${
                       variant.availability === 'in_stock'
                         ? 'border-green-600 bg-green-600 text-white'
                         : 'border-gray-300 text-gray-700 hover:bg-gray-50'
@@ -203,7 +248,7 @@ function ProductRow({ initial, onSale }: { initial: MerchantProduct; onSale: () 
                   onClick={() => sold(variant)}
                   disabled={variant.availability === 'out_of_stock'}
                   aria-pressed={variant.availability === 'out_of_stock'}
-                  className={`rounded-md border px-2.5 py-1 text-xs font-medium ${
+                  className={`h-10 rounded-lg border px-3.5 text-sm font-medium md:h-auto md:rounded-md md:px-2.5 md:py-1 md:text-xs ${
                     variant.availability === 'out_of_stock'
                       ? 'border-gray-700 bg-gray-700 text-white'
                       : 'border-gray-300 text-gray-700 hover:bg-gray-50'
@@ -374,8 +419,10 @@ function StoreCabinet({ storeId }: { storeId: string }) {
     <button
       onClick={() => setTab(value)}
       aria-current={tab === value}
-      className={`border-b-2 px-1 pb-2 text-sm font-medium ${
-        tab === value ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600'
+      className={`h-10 rounded-full border px-4 text-sm font-medium md:h-auto md:rounded-none md:border-0 md:border-b-2 md:px-1 md:pb-2 ${
+        tab === value
+          ? 'border-gray-900 bg-gray-900 text-white md:border-blue-600 md:bg-transparent md:text-blue-600'
+          : 'border-gray-200 bg-white text-gray-700 md:border-transparent md:bg-transparent md:text-gray-600'
       }`}
     >
       {label}
@@ -419,7 +466,7 @@ function StoreCabinet({ storeId }: { storeId: string }) {
         )}
       </div>
 
-      <div className="flex gap-5 overflow-x-auto border-b border-gray-200 whitespace-nowrap">
+      <div className="flex flex-wrap gap-2 whitespace-nowrap md:flex-nowrap md:gap-5 md:overflow-x-auto md:border-b md:border-gray-200">
         {tabButton('products', tr('Товары ({n})', { n: data.products.length }))}
         {tabButton('orders', tr('Заказы'))}
         {tabButton('sales', tr('Продажи'))}

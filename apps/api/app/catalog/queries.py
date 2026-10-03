@@ -13,6 +13,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from app.catalog.availability import confirmed_in_stock
 from app.catalog.models import Product, ProductStatus, ProductVariant
+from app.catalog.pricing import EFFECTIVE_PRICE
 from app.errors import ApiError
 from app.reference.models import Category
 from app.stores.models import Store, StoreStatus
@@ -40,11 +41,9 @@ class ProductFilter:
     in_stock: bool = False
     # The buyer's height in centimetres: only sizes meant for it match.
     height_cm: int | None = None
+    # Only products the store has put on sale.
+    on_sale: bool = False
     ids: list[uuid.UUID] = field(default_factory=list)
-
-
-# A variant's price: its own override, otherwise the product's base price.
-EFFECTIVE_PRICE = func.coalesce(ProductVariant.price_override_minor, Product.base_price_minor)
 
 
 def visible_products() -> list[Any]:
@@ -110,6 +109,8 @@ def matching_variants(filters: ProductFilter) -> Select:
         conditions.append(Store.city_code == filters.city_id)
     if filters.ids:
         conditions.append(Product.id.in_(filters.ids))
+    if filters.on_sale:
+        conditions.append(Product.discount_percent.is_not(None))
     for word in (filters.q or "").split():
         pattern = f"%{escape_like(word)}%"
         conditions.append(

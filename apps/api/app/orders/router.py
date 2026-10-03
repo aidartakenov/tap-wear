@@ -21,6 +21,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from app import storage
 from app.accounts.deps import CurrentUser
 from app.accounts.models import User
+from app.catalog import pricing
 from app.catalog.availability import effective_availability, set_availability
 from app.catalog.models import Availability, Product, ProductStatus, ProductVariant, StockMode
 from app.config import get_settings
@@ -377,7 +378,7 @@ def delivery_options(policy: StorePolicy | None) -> tuple[bool, bool, int | None
 
 def unit_price(variant: ProductVariant) -> int:
     # The price is taken from the catalog on the server, never from the browser.
-    return variant.price_override_minor or variant.product.base_price_minor
+    return pricing.price(variant, variant.product)
 
 
 def first_image(product: Product) -> str | None:

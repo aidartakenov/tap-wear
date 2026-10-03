@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import storage
+from app.catalog import pricing
 from app.catalog.availability import effective_availability
 from app.catalog.models import Audience, Availability, Product, ProductImage, ProductVariant
 from app.catalog.queries import (
@@ -66,6 +67,17 @@ def list_item_fields(product: Product, price_minor: int, price_varies: bool) -> 
         for variant in product.variants
         if variant.color
     }
+    # The crossed-out price belongs to the size that gives the shown (lowest) price.
+    old_price = None
+    if product.discount_percent:
+        old_price = min(
+            (
+                pricing.full_price(v, product)
+                for v in product.variants
+                if pricing.price(v, product) == price_minor
+            ),
+            default=None,
+        )
     return {
         "id": product.id,
         "store": StoreBrief(
@@ -80,6 +92,8 @@ def list_item_fields(product: Product, price_minor: int, price_varies: bool) -> 
         "audience": product.audience,
         "price_minor": price_minor,
         "price_varies": price_varies,
+        "old_price_minor": old_price,
+        "discount_percent": product.discount_percent,
         "currency": product.currency,
         "brand": product.brand,
         "colors": list(colors.values()),
@@ -114,6 +128,7 @@ def product_filter(
     city_id: str | None = None,
     in_stock: bool = False,
     height_cm: Annotated[int | None, Query(ge=50, le=250)] = None,
+    on_sale: Annotated[bool, Query(description="Only discounted products")] = False,
     ids: Annotated[list[uuid.UUID] | None, Query(max_length=100)] = None,
 ) -> ProductFilter:
     return ProductFilter(
@@ -130,6 +145,7 @@ def product_filter(
         city_id=city_id,
         in_stock=in_stock,
         height_cm=height_cm,
+        on_sale=on_sale,
         ids=ids or [],
     )
 
@@ -158,7 +174,7 @@ async def get_product_detail(
     if product is None:
         raise not_found("Product not found")
 
-    prices = [v.price_override_minor or product.base_price_minor for v in product.variants]
+    prices = [pricing.price(v, product) for v in product.variants]
     fields = list_item_fields(product, min(prices), len(set(prices)) > 1)
     fields["store"] = await to_store_out(session, product.store)
     return ProductDetail(
@@ -180,7 +196,10 @@ async def get_product_detail(
                 ),
                 height_min_cm=variant.height_min_cm,
                 height_max_cm=variant.height_max_cm,
-                price_minor=variant.price_override_minor or product.base_price_minor,
+                price_minor=pricing.price(variant, product),
+                old_price_minor=pricing.full_price(variant, product)
+                if product.discount_percent
+                else None,
                 availability=effective_availability(variant),
                 availability_confirmed_at=variant.availability_confirmed_at,
                 left=few_left(variant),

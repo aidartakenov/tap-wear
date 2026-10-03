@@ -75,6 +75,9 @@ export interface Product {
   price_minor: number;
   // True when the matching variants differ in price; shown as "от ...".
   price_varies: boolean;
+  // The same price before the store's discount, shown crossed out; null without one.
+  old_price_minor: number | null;
+  discount_percent: number | null;
   currency: string;
   brand: string | null;
   colors: Color[];
@@ -93,6 +96,8 @@ export interface Variant {
   height_min_cm: number | null;
   height_max_cm: number | null;
   price_minor: number;
+  // Before the store's discount; null without one.
+  old_price_minor: number | null;
   availability: Availability;
   availability_confirmed_at: string | null;
   // Pieces left, when the store counts its stock and few remain.
@@ -149,6 +154,8 @@ export interface FilterState {
   // The buyer's height in centimetres; null when not filtering by it.
   height: number | null;
   inStock: boolean;
+  // Only discounted products.
+  sale: boolean;
   sort: SortOrder;
 }
 
@@ -239,6 +246,8 @@ export interface MerchantProduct {
   category: { code: string; name: string };
   audience: Audience;
   base_price_minor: number;
+  // "Скидка −30%" on the whole product; null when none.
+  discount_percent: number | null;
   currency: string;
   brand: string | null;
   sku: string | null;
@@ -256,6 +265,7 @@ export interface ProductInput {
   category: string;
   audience: Audience;
   base_price_minor: number;
+  discount_percent: number | null;
   brand: string | null;
   variants: VariantInput[];
 }

@@ -4,6 +4,8 @@ import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { AppProvider } from "@/lib/context";
 import { InstallApp } from "@/components/InstallApp";
+import { FaqDrawer } from "@/components/FaqDrawer";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { cookies } from "next/headers";
 import { getCatalogFilters } from "@/lib/api";
@@ -50,6 +52,8 @@ export default async function RootLayout({
           <InstallApp />
           <SiteHeader />
           {children}
+          <SiteFooter />
+          <FaqDrawer />
         </AppProvider>
       </body>
     </html>

@@ -171,11 +171,23 @@ function ProductView({ product }: { product: ProductDetail }) {
               </Badge>
             ))}
           </div>
-          <p className="text-2xl font-bold text-gray-900">
-            {selected
-              ? formatPrice(selected.price_minor)
-              : formatPrice(product.price_minor, product.price_varies, locale)}
-          </p>
+          <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+            <p className={`text-2xl font-bold ${product.discount_percent ? 'text-red-600' : 'text-gray-900'}`}>
+              {selected
+                ? formatPrice(selected.price_minor)
+                : formatPrice(product.price_minor, product.price_varies, locale)}
+            </p>
+            {(selected ? selected.old_price_minor : product.old_price_minor) && (
+              <s className="text-base text-gray-500">
+                {formatPrice((selected ? selected.old_price_minor : product.old_price_minor) ?? 0)}
+              </s>
+            )}
+            {product.discount_percent && (
+              <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+                −{product.discount_percent}%
+              </span>
+            )}
+          </div>
           <p className={`text-sm mt-1 ${availabilityColor[availability]}`}>
             {t(`availability.${availability}`)}
             {selected?.availability_confirmed_at &&

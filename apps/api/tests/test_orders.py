@@ -481,3 +481,97 @@ def test_sales_book_downloads_as_a_pdf_for_the_store_only(client, seller):
     stranger = Actor(client, "pdf-stranger@orders.test")
     assert stranger.get("/merchant/sales/pdf", params={"store_id": store_id}).status_code == 404
     seller.delete(f"/merchant/sales/{sold['sale_id']}")
+
+
+def test_store_discount_lowers_the_price_everywhere_and_can_be_removed(client, seller):
+    buyer = Actor(client, "buyer@orders.test", register=False)
+    product_id = str(IDS["jacket"])
+    target = variant_id("jacket", "L")
+    restock()
+
+    def discount(percent):
+        version = seller.get(f"/merchant/products/{product_id}").json()["version"]
+        return seller.patch(
+            f"/merchant/products/{product_id}",
+            json={"expected_version": version, "discount_percent": percent},
+        )
+
+    full = client.get(f"/api/v1/products/{product_id}").json()
+    full_price = next(v["price_minor"] for v in full["variants"] if v["id"] == target)
+    assert full["discount_percent"] is None and full["old_price_minor"] is None
+
+    assert discount(95).status_code == 422
+    assert discount(30).json()["discount_percent"] == 30
+
+    # Rounded down to whole soms; the full price is shown crossed out.
+    sale = full_price * 70 // 100 // SOM * SOM
+    detail = client.get(f"/api/v1/products/{product_id}").json()
+    variant = next(v for v in detail["variants"] if v["id"] == target)
+    assert variant == variant | {"price_minor": sale, "old_price_minor": full_price}
+    assert detail["discount_percent"] == 30 and detail["old_price_minor"] is not None
+
+    # The "on sale" filter finds it, and the price filter uses the new price.
+    on_sale = client.get("/api/v1/products", params={"on_sale": True, "limit": 100}).json()
+    assert product_id in {item["id"] for item in on_sale["items"]}
+    assert all(item["discount_percent"] for item in on_sale["items"])
+    cheap = client.get("/api/v1/products", params={"price_max_minor": sale, "limit": 100}).json()
+    assert product_id in {item["id"] for item in cheap["items"]}
+
+    # An order is charged the discounted price.
+    order = buy(buyer, target).json()
+    assert order["items"][0]["price_minor"] == sale
+    buyer.post(f"/orders/{order['id']}/cancel")
+
+    # Sent as null, the discount is gone.
+    assert discount(None).json()["discount_percent"] is None
+    again = client.get(f"/api/v1/products/{product_id}").json()
+    assert next(v for v in again["variants"] if v["id"] == target)["price_minor"] == full_price
+    on_sale = client.get("/api/v1/products", params={"on_sale": True, "limit": 100}).json()
+    assert product_id not in {item["id"] for item in on_sale["items"]}
+
+
+def test_buyer_deletes_the_account_and_stores_keep_their_records(client, seller):
+    from tests.conftest import PASSWORD
+    from tests.test_merchant import API
+
+    buyer = Actor(client, "leaving@orders.test")
+    restock()
+    # A finished purchase that the store keeps in its sales book.
+    order = buy(buyer, phone="+996 700 111 222").json()
+    buyer.post(f"/orders/{order['id']}/test-pay")
+    seller.post(f"/merchant/orders/{order['id']}/status", json={"status": "accepted"})
+
+    # Not while the store is still working on the order, and never without the password.
+    assert buyer.request("DELETE", "/auth/me", json={"password": "wrong-one"}).status_code == 403
+    busy = buyer.request("DELETE", "/auth/me", json={"password": PASSWORD})
+    assert busy.json()["code"] == "orders_in_progress"
+    seller.post(f"/merchant/orders/{order['id']}/status", json={"status": "shipped"})
+    seller.post(f"/merchant/orders/{order['id']}/status", json={"status": "completed"})
+
+    assert buyer.request("DELETE", "/auth/me", json={"password": PASSWORD}).status_code == 204
+    # Signed out everywhere, and the email and password no longer work.
+    assert buyer.get("/me/favorites").status_code == 401
+    client.cookies.clear()
+    login = client.post(
+        f"{API}/auth/login", json={"email": "leaving@orders.test", "password": PASSWORD}
+    )
+    assert login.status_code == 401
+    # The same email can sign up again as a new person.
+    Actor(client, "leaving@orders.test")
+
+    # The store still has the sale, without the buyer's phone or name.
+    orders = seller.get("/merchant/orders", params={"store_id": str(IDS["open"])}).json()
+    kept = next(o for o in orders if o["id"] == order["id"])
+    assert "700 111 222" not in str(kept)
+    report = seller.get("/merchant/sales", params={"store_id": str(IDS["open"]), "days": 1}).json()
+    line = next(line for line in report["lines"] if line["order_number"] == order["number"])
+    assert line["buyer"] == "Удалённый пользователь"
+
+
+def test_store_owner_cannot_delete_the_account(client, seller):
+    from tests.conftest import PASSWORD, make_member
+
+    owner = Actor(client, "owner-leaving@orders.test")
+    make_member("owner-leaving@orders.test", "open", role="owner")
+    refused = owner.request("DELETE", "/auth/me", json={"password": PASSWORD})
+    assert refused.json()["code"] == "owns_store"

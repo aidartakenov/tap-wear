@@ -195,14 +195,18 @@ export function StoreSales({ storeId }: { storeId: string }) {
   return (
     <div className={cn('space-y-4', loading && 'opacity-60')}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr('Период')}>
+        <div
+          className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:px-0"
+          role="group"
+          aria-label={tr('Период')}
+        >
           {PERIODS.map((period) => (
             <button
               key={period.days}
               onClick={() => setDays(period.days)}
               aria-pressed={days === period.days}
               className={cn(
-                'rounded-full border px-3 py-1.5 text-sm font-medium',
+                'h-10 shrink-0 rounded-full border px-4 text-sm font-medium md:h-9 md:px-3',
                 days === period.days ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
               )}
             >
@@ -282,10 +286,10 @@ export function StoreSales({ storeId }: { storeId: string }) {
           <section className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-semibold text-gray-900">{tr('Журнал продаж: {n}', { n: data.lines.length })}</h3>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
                 <button onClick={download} className={secondaryButton}>
                   <Download className="h-4 w-4" />
-                  {tr('Скачать для Excel')}
+                  {tr('Скачать Excel')}
                 </button>
                 <button onClick={downloadPdf} disabled={makingPdf} className={secondaryButton}>
                   <FileText className="h-4 w-4" />
@@ -294,7 +298,42 @@ export function StoreSales({ storeId }: { storeId: string }) {
               </div>
             </div>
             <FormError error={failure} />
-            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            {/* Phones: one card per sale instead of a wide table. */}
+            <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white md:hidden">
+              {data.lines.slice(0, shown).map((line) => (
+                <li key={line.id} className="flex items-start gap-3 px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-gray-900">{line.title}</p>
+                    <p className="text-xs text-gray-600">
+                      {[line.size_label, line.color_name].filter(Boolean).join(', ')}
+                      {line.quantity > 1 && ` · ${tr('{n} шт.', { n: line.quantity })}`}
+                    </p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+                      {moment(line.sold_at)} ·{' '}
+                      {line.channel === 'site'
+                        ? tr('Заказ №{number}', { number: line.order_number ?? '' })
+                        : `${tr('Магазин')}${line.note ? ` · ${line.note}` : ''}`}
+                      {line.channel === 'site' && line.status && (
+                        <StatusBadge status={line.status} label={t(`orders.status.${line.status as 'paid'}`)} />
+                      )}
+                    </p>
+                  </div>
+                  <p className="whitespace-nowrap text-sm font-semibold tabular-nums text-gray-900">
+                    {formatPrice(line.total_minor)}
+                  </p>
+                  {line.channel === 'shop' && (
+                    <button
+                      onClick={() => remove(line.id)}
+                      aria-label={tr('Убрать продажу')}
+                      className="-my-1 -mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
               <table className="min-w-full text-left text-sm">
                 <thead className="border-b border-gray-200 bg-gray-50 text-xs text-gray-600">
                   <tr>
@@ -355,7 +394,7 @@ export function StoreSales({ storeId }: { storeId: string }) {
                 key={value}
                 onClick={() => setStockFilter(value)}
                 aria-pressed={stockFilter === value}
-                className={cn('px-3 py-1.5', stockFilter === value ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-100')}
+                className={cn('h-9 px-3.5', stockFilter === value ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-100')}
               >
                 {tr(value === 'all' ? 'Все' : 'Заканчиваются')}
               </button>
@@ -367,7 +406,33 @@ export function StoreSales({ storeId }: { storeId: string }) {
             {tr(stockFilter === 'low' ? 'Ничего не заканчивается.' : 'Товаров пока нет.')}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <>
+          <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white md:hidden">
+            {stock.map((row) => (
+              <li key={row.variant_id} className="flex items-center gap-3 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-900">{row.title}</p>
+                  <p className="text-xs text-gray-600">
+                    {[row.size_label, row.color_name].filter(Boolean).join(', ') || '—'} · {formatPrice(row.price_minor)}
+                    {row.sold > 0 && ` · ${tr('продано: {n}', { n: row.sold })}`}
+                  </p>
+                </div>
+                <p
+                  className={cn(
+                    'whitespace-nowrap text-sm font-semibold',
+                    row.availability === 'out_of_stock'
+                      ? 'text-red-700'
+                      : row.quantity !== null && row.quantity <= 2
+                        ? 'text-amber-800'
+                        : 'text-gray-900'
+                  )}
+                >
+                  {row.quantity !== null ? tr('{n} шт.', { n: row.quantity }) : tr(stockShort[row.availability])}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 text-xs text-gray-600">
                 <tr>
@@ -393,6 +458,7 @@ export function StoreSales({ storeId }: { storeId: string }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
         <p className="text-xs text-gray-500">
           {tr('Точное число показывается у размеров, для которых вы указали «Сколько штук» в карточке товара. У остальных видно только «есть» или «нет».')}

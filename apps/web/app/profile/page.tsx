@@ -14,7 +14,7 @@ import {
   primaryButton,
   secondaryButton,
 } from '@/components/form';
-import { changePassword, updateProfile } from '@/lib/api';
+import { changePassword, deleteAccount, updateProfile } from '@/lib/api';
 import { useApp } from '@/lib/context';
 import { Me } from '@/lib/types';
 
@@ -134,8 +134,87 @@ function AccountSettings({ me }: { me: Me }) {
             {passwordState.saved && <span className="text-sm text-green-700">{t('profile.passwordChanged')}</span>}
           </div>
         </form>
+
+        <DeleteAccount />
       </div>
     </details>
+  );
+}
+
+// Deleting the account: explained first, then confirmed with the password.
+function DeleteAccount() {
+  const { t, forgetAccount } = useApp();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteAccount(password);
+      forgetAccount();
+      router.replace('/?account=deleted');
+    } catch (cause) {
+      setError(cause);
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-sm font-medium text-red-700 hover:underline"
+      >
+        {t('profile.deleteAccount')}
+      </button>
+    );
+  }
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-xl border border-red-200 bg-red-50 p-4">
+      <p className="font-semibold text-red-900">{t('profile.deleteTitle')}</p>
+      <ul className="list-disc space-y-1 pl-5 text-sm text-red-900">
+        <li>{t('profile.deleteGone')}</li>
+        <li>{t('profile.deleteOrders')}</li>
+        <li>{t('profile.deleteStore')}</li>
+      </ul>
+      <Field label={t('profile.deletePassword')}>
+        <input
+          className={inputClass}
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete="current-password"
+          required
+        />
+      </Field>
+      <FormError error={error} />
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="submit"
+          disabled={busy || !password}
+          className="inline-flex h-10 items-center justify-center rounded-full bg-red-600 px-5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+        >
+          {busy ? t('login.wait') : t('profile.deleteConfirm')}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setPassword('');
+            setError(null);
+          }}
+          className={secondaryButton}
+        >
+          {t('profile.deleteCancel')}
+        </button>
+      </div>
+    </form>
   );
 }
 

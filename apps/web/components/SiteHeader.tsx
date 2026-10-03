@@ -187,6 +187,12 @@ export function SiteHeader() {
           </Link>
         ))}
         <Link
+          href="/catalog?sale=1"
+          className="shrink-0 px-3 py-2.5 text-sm font-semibold text-red-600 border-b-2 border-transparent hover:border-red-400"
+        >
+          {t('nav.sale')}
+        </Link>
+        <Link
           href="/catalog"
           className="shrink-0 px-3 py-2.5 text-sm text-gray-600 border-b-2 border-transparent hover:border-gray-400 hover:text-gray-900"
         >

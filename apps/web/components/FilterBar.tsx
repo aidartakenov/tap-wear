@@ -239,6 +239,15 @@ export function FilterBar() {
               />
               {t('filter.inStockOnly')}
             </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-red-600 md:self-end md:pb-1.5">
+              <input
+                type="checkbox"
+                checked={filter.sale}
+                onChange={(event) => setFilter({ sale: event.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              {t('filter.saleOnly')}
+            </label>
           </div>
         </div>
       )}

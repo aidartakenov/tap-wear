@@ -25,7 +25,10 @@ class VariantOut(BaseModel):
     # The seller's recommended height for this size, in cm; null when not given.
     height_min_cm: int | None
     height_max_cm: int | None
+    # What the buyer pays now, with the store's discount.
     price_minor: int
+    # The price before the discount, shown crossed out; null without a discount.
+    old_price_minor: int | None
     availability: Availability
     availability_confirmed_at: datetime | None
     # How many pieces are left, when the store counts its stock and few remain.
@@ -42,6 +45,9 @@ class ProductListItem(BaseModel):
     price_minor: int
     # True when matching variants have different prices, so the UI shows "from ...".
     price_varies: bool
+    # The same price before the store's discount, shown crossed out; null without one.
+    old_price_minor: int | None
+    discount_percent: int | None
     currency: str
     brand: str | None
     colors: list[ColorOut]

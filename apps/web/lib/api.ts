@@ -154,6 +154,7 @@ export function productParams({ filter = {}, ids, cursor, limit = PAGE_SIZE }: P
   if (filter.maxPrice != null) params.set('price_max_minor', String(filter.maxPrice * 100));
   if (filter.height != null) params.set('height_cm', String(filter.height));
   if (filter.inStock) params.set('in_stock', 'true');
+  if (filter.sale) params.set('on_sale', 'true');
   if (filter.sort && filter.sort !== 'default') params.set('sort', filter.sort);
   ids?.forEach((id) => params.append('ids', id));
   set('cursor', cursor);
@@ -206,6 +207,9 @@ export const forgotPassword = (email: string) =>
 export const resetPassword = (token: string, newPassword: string) =>
   send<void>('POST', '/auth/password/reset', { token, new_password: newPassword });
 export const updateProfile = (name: string) => send<Me>('PATCH', '/auth/me', { name });
+// Deletes the signed-in account for good; the password is asked once more.
+export const deleteAccount = (password: string) =>
+  send<void>('DELETE', '/auth/me', { password });
 export const changePassword = (currentPassword: string, newPassword: string) =>
   send<void>('POST', '/auth/password', {
     current_password: currentPassword,
@@ -278,6 +282,12 @@ export const getMyProduct = (id: string, signal?: AbortSignal) =>
   get<MerchantProduct>(`/merchant/products/${id}`, undefined, signal);
 export const createProduct = (storeId: string, product: ProductInput) =>
   send<MerchantProduct>('POST', '/merchant/products', { store_id: storeId, ...product });
+// Put a product on sale (percent) or take it off (null), straight from the list.
+export const setProductDiscount = (id: string, expectedVersion: number, percent: number | null) =>
+  send<MerchantProduct>('PATCH', `/merchant/products/${id}`, {
+    expected_version: expectedVersion,
+    discount_percent: percent,
+  });
 export const updateProduct = (id: string, expectedVersion: number, product: ProductInput) =>
   send<MerchantProduct>('PATCH', `/merchant/products/${id}`, {
     expected_version: expectedVersion,

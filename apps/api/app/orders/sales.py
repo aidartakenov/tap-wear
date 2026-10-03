@@ -21,6 +21,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from app import storage
 from app.accounts.deps import CurrentUser
 from app.accounts.models import User
+from app.catalog import pricing
 from app.catalog.availability import effective_availability, set_availability
 from app.catalog.models import Availability, Product, ProductStatus, ProductVariant, StockMode
 from app.database import get_session
@@ -302,7 +303,7 @@ async def sales_report(
                 color_name=color,
                 quantity=variant.quantity if variant.stock_mode == StockMode.EXACT else None,
                 availability=effective_availability(variant),
-                price_minor=variant.price_override_minor or variant.product.base_price_minor,
+                price_minor=pricing.price(variant, variant.product),
                 sold=sold_by_variant.get((variant.product_id, variant.size_label, color), 0),
             )
         )
@@ -404,7 +405,7 @@ async def mark_sold(variant_id: uuid.UUID, user: CurrentUser, db: Db) -> SoldOut
         title=variant.product.title,
         size_label=variant.size_label,
         color_name=display_name(variant.color) if variant.color else None,
-        price_minor=variant.price_override_minor or variant.product.base_price_minor,
+        price_minor=pricing.price(variant, variant.product),
         quantity=1,
         reserved=counted,
         closed_stock=closed,

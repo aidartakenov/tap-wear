@@ -53,6 +53,10 @@ class Product(Base):
     __tablename__ = "products"
     __table_args__ = (
         CheckConstraint("base_price_minor > 0", name="base_price_positive"),
+        CheckConstraint(
+            "discount_percent IS NULL OR discount_percent BETWEEN 1 AND 90",
+            name="discount_percent_valid",
+        ),
         CheckConstraint("audience IN ('men', 'women', 'unisex', 'kids')", name="audience_valid"),
         CheckConstraint(
             "status IN ('draft', 'pending_review', 'published', 'archived', 'blocked')",
@@ -73,6 +77,9 @@ class Product(Base):
     # Money is an integer in the currency's minor unit (tyiyn for KGS), never a float.
     base_price_minor: Mapped[int] = mapped_column(BigInteger)
     currency: Mapped[str] = mapped_column(String(3), default="KGS")
+    # The store's discount on the whole product, in percent ("скидка −30%"); null when none.
+    # See app.catalog.pricing for what it does to each size's price.
+    discount_percent: Mapped[int | None] = mapped_column()
     brand: Mapped[str | None] = mapped_column(String(100))
     sku: Mapped[str | None] = mapped_column(String(100))
     source_url: Mapped[str | None] = mapped_column(String(500))

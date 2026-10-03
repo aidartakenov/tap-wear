@@ -45,6 +45,11 @@ export function ProductCard({ product }: ProductCardProps) {
                 }`}
               />
             </button>
+            {product.discount_percent && (
+              <span className="absolute right-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+                −{product.discount_percent}%
+              </span>
+            )}
             {product.availability === 'out_of_stock' && (
               <span className="absolute bottom-2 left-2 rounded-full bg-gray-900/80 px-2 py-0.5 text-xs font-medium text-white">
                 {t('availability.out_of_stock')}
@@ -68,8 +73,13 @@ export function ProductCard({ product }: ProductCardProps) {
                 {t('product.sizesList', { sizes: product.sizes.join(', ') })}
               </p>
             )}
-            <p className="font-bold text-sm text-gray-900">
-              {formatPrice(product.price_minor, product.price_varies, locale)}
+            <p className="flex flex-wrap items-baseline gap-x-1.5 text-sm">
+              <span className={`font-bold ${product.old_price_minor ? 'text-red-600' : 'text-gray-900'}`}>
+                {formatPrice(product.price_minor, product.price_varies, locale)}
+              </span>
+              {product.old_price_minor && (
+                <s className="text-xs text-gray-500">{formatPrice(product.old_price_minor)}</s>
+              )}
             </p>
           </div>
         </CardContent>

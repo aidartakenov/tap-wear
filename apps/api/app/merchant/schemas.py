@@ -14,6 +14,8 @@ Text200 = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200
 Text300 = Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)]
 Phone = Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)]
 PriceMinor = Annotated[int, Field(gt=0, le=10_000_000_00)]
+# "Скидка −30%": a whole number of percent.
+DiscountPercent = Annotated[int, Field(ge=1, le=90)]
 
 
 class StoreIn(BaseModel):
@@ -109,6 +111,7 @@ class ProductIn(BaseModel):
     audience: Audience
     # A public price is mandatory; "price on request" is not allowed.
     base_price_minor: PriceMinor
+    discount_percent: DiscountPercent | None = None
     brand: Text100 | None = None
     sku: Text100 | None = None
     variants: Annotated[list[VariantIn], Field(max_length=200)] = []
@@ -128,6 +131,8 @@ class ProductUpdate(BaseModel):
     category: str | None = None
     audience: Audience | None = None
     base_price_minor: PriceMinor | None = None
+    # Sent as null, the discount is removed; left out, it stays as it is.
+    discount_percent: DiscountPercent | None = None
     brand: Text100 | None = None
     sku: Text100 | None = None
     # When given, replaces the full set of variants.
@@ -181,6 +186,7 @@ class MerchantProductOut(BaseModel):
     category: CategoryOut
     audience: Audience
     base_price_minor: int
+    discount_percent: int | None
     currency: str
     brand: str | None
     sku: str | None

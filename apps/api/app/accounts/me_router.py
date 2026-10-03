@@ -4,23 +4,27 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.accounts.deps import CurrentUser, require_session
-from app.accounts.models import Favorite, Session
+from app.accounts.models import AccountToken, Favorite, Session
 from app.accounts.router import MeOut, me_out
 from app.accounts.security import hash_password, verify_password
 from app.catalog.models import Product
 from app.catalog.queries import visible_products
+from app.config import get_settings
 from app.database import get_session
 from app.errors import ApiError, not_found
-from app.stores.models import Store
+from app.orders.models import Order, OrderStatus, PaymentStatus
+from app.orders.router import release
+from app.stores.models import MemberRole, Store, StoreMember
 
 router = APIRouter(tags=["account"])
+settings = get_settings()
 
 Db = Annotated[AsyncSession, Depends(get_session)]
 
@@ -34,6 +38,15 @@ class ProfileIn(BaseModel):
 class PasswordIn(BaseModel):
     current_password: str = Field(max_length=200)
     new_password: str = Field(min_length=8, max_length=200)
+
+
+class DeleteAccountIn(BaseModel):
+    # The account is gone for good, so the password is asked once more.
+    password: str = Field(max_length=200)
+
+
+# Orders the store is still working on: the account must stay until they are done.
+OPEN_ORDERS = (OrderStatus.PAID, OrderStatus.ACCEPTED, OrderStatus.SHIPPED)
 
 
 class FavoriteIds(BaseModel):
@@ -103,6 +116,68 @@ async def change_password(
         .values(revoked_at=datetime.now(UTC))
     )
     await db.commit()
+
+
+@router.delete("/auth/me", status_code=204)
+async def delete_account(
+    body: DeleteAccountIn,
+    response: Response,
+    session: Annotated[Session, Depends(require_session)],
+    db: Db,
+) -> None:
+    """Delete the signed-in person's account.
+
+    The person can no longer sign in and their personal data is removed: email,
+    name, password, favourites, phone and address on past orders. The orders
+    themselves stay, without the person, because the store's sales book needs them.
+    """
+    user = session.user
+    if not verify_password(body.password, user.password_hash):
+        raise ApiError(403, "wrong_password", "The password is wrong")
+    if user.is_admin:
+        raise ApiError(409, "admin_account", "An administrator account cannot delete itself")
+    owner = await db.scalar(
+        select(StoreMember.id).where(
+            StoreMember.user_id == user.id, StoreMember.role == MemberRole.OWNER
+        )
+    )
+    if owner:
+        raise ApiError(
+            409, "owns_store", "Hand the store over or close it before deleting the account"
+        )
+    busy = await db.scalar(
+        select(Order.id).where(Order.user_id == user.id, Order.status.in_(OPEN_ORDERS))
+    )
+    if busy:
+        raise ApiError(409, "orders_in_progress", "Wait until your orders are completed")
+
+    orders = (await db.scalars(select(Order).where(Order.user_id == user.id))).all()
+    for order in orders:
+        # An order nobody paid for yet is called off, and its pieces go back on sale.
+        if order.status == OrderStatus.PENDING_PAYMENT:
+            order.status = OrderStatus.CANCELLED
+            order.payments[-1].status = PaymentStatus.CANCELLED
+            await release(db, order)
+        order.buyer_phone = "—"
+        order.delivery_address = None
+
+    await db.execute(delete(Favorite).where(Favorite.user_id == user.id))
+    await db.execute(delete(AccountToken).where(AccountToken.user_id == user.id))
+    await db.execute(delete(StoreMember).where(StoreMember.user_id == user.id))
+    await db.execute(
+        update(Session)
+        .where(Session.user_id == user.id, Session.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(UTC))
+    )
+    # The row stays, without anything personal, because orders and store
+    # records refer to it.
+    user.email = f"deleted-{user.id}@deleted.invalid"
+    user.name = "Удалённый пользователь"
+    user.password_hash = "deleted"
+    user.email_verified_at = None
+    user.is_active = False
+    await db.commit()
+    response.delete_cookie(settings.session_cookie_name, path="/")
 
 
 @router.get("/me/favorites")

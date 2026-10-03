@@ -31,6 +31,8 @@ interface AppContextType {
   signIn: (email: string, password: string) => Promise<Me>;
   signUp: (email: string, password: string, name: string) => Promise<Me>;
   signOut: () => Promise<void>;
+  // After the account was deleted on the server: forget it here without calling the API.
+  forgetAccount: () => void;
   setMe: (me: Me) => void;
   // What the buyer is about to order. It lives on this device until checkout.
   cart: CartItem[];
@@ -242,6 +244,7 @@ export function AppProvider({
         signIn,
         signUp,
         signOut,
+        forgetAccount: () => remember(null),
         setMe,
         cart,
         cartCount: cart.reduce((sum, item) => sum + item.quantity, 0),

@@ -61,6 +61,7 @@ export const defaultFilter: FilterState = {
   size: '',
   height: null,
   inStock: false,
+  sale: false,
   sort: 'default',
 };
 
@@ -72,6 +73,15 @@ export function formatPrice(priceMinor: number, priceVaries = false, locale = 'r
   if (!priceVaries) return amount;
   // "from 4 500 soms": the lowest price among variants that cost differently.
   return locale === 'ky' ? `${amount}дон` : `от ${amount}`;
+}
+
+// The store's discount, as the server applies it: rounded down to whole soms,
+// never below 1 som (see app/catalog/pricing.py).
+export const DISCOUNT_CHOICES = [10, 20, 30, 40, 50, 70];
+export function discountedPrice(fullMinor: number, percent: number | null): number {
+  if (!percent) return fullMinor;
+  const rounded = Math.floor(Math.floor((fullMinor * (100 - percent)) / 100) / 100) * 100;
+  return Math.min(fullMinor, Math.max(rounded, 100));
 }
 
 // Russian plural: plural(21, ['товар', 'товара', 'товаров']) -> "21 товар".
@@ -117,6 +127,7 @@ export function filterFromParams(params: URLSearchParams): FilterState {
     size: params.get('size') ?? '',
     height: number('height'),
     inStock: params.get('in_stock') === '1',
+    sale: params.get('sale') === '1',
     sort: sort && sort in sortLabels ? sort : 'default',
   };
 }
@@ -134,6 +145,7 @@ export function filterToQuery(filter: Partial<FilterState>): string {
   if (full.size) params.set('size', full.size);
   if (full.height != null) params.set('height', String(full.height));
   if (full.inStock) params.set('in_stock', '1');
+  if (full.sale) params.set('sale', '1');
   if (full.sort !== 'default') params.set('sort', full.sort);
   return params.toString();
 }

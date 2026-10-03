@@ -107,6 +107,25 @@ export default function LoginPage() {
           <button type="submit" disabled={busy} className={`${primaryButton} w-full`}>
             {t(busy ? 'login.wait' : mode === 'login' ? 'nav.signIn' : 'login.create')}
           </button>
+          {mode === 'register' && (
+            <p className="text-xs leading-relaxed text-gray-500">
+              {t('login.agree')
+                .split(/(\{terms\}|\{privacy\})/)
+                .map((part, index) =>
+                  part === '{terms}' ? (
+                    <Link key={index} href="/terms" className="text-blue-600 hover:underline">
+                      {t('login.agreeTerms')}
+                    </Link>
+                  ) : part === '{privacy}' ? (
+                    <Link key={index} href="/privacy" className="text-blue-600 hover:underline">
+                      {t('login.agreePrivacy')}
+                    </Link>
+                  ) : (
+                    part
+                  )
+                )}
+            </p>
+          )}
         </form>
       </main>
       <BottomNavigation />

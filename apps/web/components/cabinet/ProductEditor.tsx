@@ -25,8 +25,11 @@ import {
   uploadProductImage,
 } from '@/lib/api';
 import {
+  DISCOUNT_CHOICES,
   colorSwatches,
+  discountedPrice,
   formatHeight,
+  formatPrice,
   minorToInput,
   parseHeight,
   parsePriceToMinor,
@@ -64,6 +67,8 @@ interface FormState {
   category: string;
   audience: Audience;
   price: string;
+  // "Скидка −30%"; null when the product is not on sale.
+  discount: number | null;
   brand: string;
   sizeSystem: string;
   variants: VariantRow[];
@@ -116,6 +121,7 @@ function toForm(product: MerchantProduct | null, reference: Reference): FormStat
       category: reference.categories[0]?.code ?? '',
       audience: 'women',
       price: '',
+      discount: null,
       brand: '',
       sizeSystem: 'INT',
       variants: [newRow()],
@@ -128,6 +134,7 @@ function toForm(product: MerchantProduct | null, reference: Reference): FormStat
     category: product.category.code,
     audience: product.audience,
     price: minorToInput(product.base_price_minor),
+    discount: product.discount_percent,
     brand: product.brand ?? '',
     sizeSystem: product.variants.find((variant) => variant.size_system)?.size_system ?? '',
     variants: toRows(product.variants),
@@ -247,6 +254,7 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
       category: form.category,
       audience: form.audience,
       base_price_minor: basePrice,
+      discount_percent: form.discount,
       brand: form.brand.trim() || null,
       variants,
     };
@@ -360,6 +368,58 @@ export function ProductEditor({ storeId, product: initial, reference }: ProductE
               />
             </Field>
           </div>
+          <fieldset>
+            <legend className="mb-1 block text-sm font-medium text-gray-700">{tr('Скидка')}</legend>
+            <div className="flex flex-wrap gap-2">
+              {[null, ...DISCOUNT_CHOICES].map((percent) => (
+                <button
+                  key={percent ?? 'none'}
+                  type="button"
+                  onClick={() => set('discount', percent)}
+                  aria-pressed={form.discount === percent}
+                  className={`h-9 rounded-full border px-3.5 text-sm font-medium ${
+                    form.discount === percent
+                      ? percent
+                        ? 'border-red-600 bg-red-600 text-white'
+                        : 'border-gray-900 bg-gray-900 text-white'
+                      : 'border-gray-300 bg-white text-gray-900 hover:border-gray-900'
+                  }`}
+                >
+                  {percent ? `−${percent}%` : tr('Без скидки')}
+                </button>
+              ))}
+              <label className="flex h-9 items-center gap-1 rounded-full border border-gray-300 bg-white pl-3 pr-2 text-sm text-gray-700">
+                {tr('Другая')}
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={90}
+                  value={form.discount && !DISCOUNT_CHOICES.includes(form.discount) ? form.discount : ''}
+                  onChange={(event) => {
+                    const value = Math.round(Number(event.target.value));
+                    set('discount', value >= 1 && value <= 90 ? value : null);
+                  }}
+                  className="w-12 bg-transparent text-right text-base text-gray-900 outline-none md:text-sm"
+                  placeholder="15"
+                />
+                %
+              </label>
+            </div>
+            {form.discount && parsePriceToMinor(form.price) ? (
+              <p className="mt-1.5 text-sm text-gray-700">
+                {tr('Покупатели увидят:')}{' '}
+                <span className="font-bold text-red-600">
+                  {formatPrice(discountedPrice(parsePriceToMinor(form.price) ?? 0, form.discount))}
+                </span>{' '}
+                <s className="text-gray-500">{formatPrice(parsePriceToMinor(form.price) ?? 0)}</s>
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-gray-500">
+                {tr('Старая цена будет зачёркнута, товар попадёт в раздел «Скидки».')}
+              </p>
+            )}
+          </fieldset>
           <Field label={tr('Бренд')} hint={tr('Необязательно')}>
             <input
               className={inputClass}

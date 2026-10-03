@@ -29,7 +29,7 @@ export function useCatalogFilter() {
   }, [pathname, router]);
 
   // Sorting is not a filter; price min and max count as one.
-  const keys = ['query', 'audience', 'category', 'store', 'color', 'size', 'inStock'] as const;
+  const keys = ['query', 'audience', 'category', 'store', 'color', 'size', 'inStock', 'sale'] as const;
   const activeCount =
     keys.filter((key) => filter[key] !== defaultFilter[key]).length +
     (filter.minPrice > 0 || filter.maxPrice != null ? 1 : 0) +

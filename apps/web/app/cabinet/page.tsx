@@ -59,6 +59,14 @@ function Cabinet() {
         </Link>
       ))}
 
+      <Link
+        href="/help/sellers"
+        className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800 hover:bg-blue-100"
+      >
+        {tr('Как пользоваться кабинетом: товары, «Есть» и «Продано», скидки, заказы')}
+        <ChevronRight className="h-4 w-4 shrink-0" />
+      </Link>
+
       {showForm ? (
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <h2 className="font-semibold text-gray-900">

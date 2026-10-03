@@ -7,7 +7,17 @@ export const dynamic = 'force-dynamic';
 
 // Every public page a search engine should know about.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const pages: MetadataRoute.Sitemap = ['', '/catalog', '/stores', '/size-guide'].map((path) => ({
+  const pages: MetadataRoute.Sitemap = [
+    '',
+    '/catalog',
+    '/stores',
+    '/size-guide',
+    '/about',
+    '/faq',
+    '/help/sellers',
+    '/terms',
+    '/privacy',
+  ].map((path) => ({
     url: `${SITE_URL}${path}`,
     changeFrequency: 'daily',
   }));
